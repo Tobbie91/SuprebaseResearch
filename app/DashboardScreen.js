@@ -60,33 +60,6 @@ const FeatureCard = ({ icon, title, subtitle, onClick, color = C.p }) => (
   </div>
 );
 
-// ✅ Bottom navigation for easy switching
-const BottomNav = ({ active, setScreen }) => {
-  const tabs = [
-    { key: "home", icon: <Wallet />, label: "Home" },
-    { key: "rosca", icon: <Users />, label: "ROSCA" },
-    { key: "fixed", icon: <Clock />, label: "Fixed" },
-    { key: "invest", icon: <TrendingUp />, label: "Invest" },
-  ];
-
-  return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around py-2 shadow-md z-50">
-      {tabs.map((tab) => (
-        <button
-          key={tab.key}
-          onClick={() => setScreen(tab.key)}
-          className={`flex flex-col items-center ${
-            active === tab.key ? "text-green-700" : "text-gray-500"
-          }`}
-        >
-          <div className="mb-1">{tab.icon}</div>
-          <span className="text-[11px] font-medium">{tab.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-};
-
 // ✅ Full DashboardScreen Component
 export default function DashboardScreen({
   userData,
@@ -320,7 +293,7 @@ export default function DashboardScreen({
 
       {/* --- Research Analytics for Super Admin --- */}
       {userRole === "superadmin" && (
-        <div className="px-6 mt-8">
+        <div className="px-6 mt-8 mb-6">
           <button
             onClick={() => setCurrentScreen("analytics")}
             className="w-full py-4 rounded-xl font-semibold text-white"
@@ -330,9 +303,6 @@ export default function DashboardScreen({
           </button>
         </div>
       )}
-
-      {/* --- Bottom Navigation --- */}
-      <BottomNav active="home" setScreen={setCurrentScreen} />
     </div>
   );
 }

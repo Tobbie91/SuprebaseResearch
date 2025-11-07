@@ -29,6 +29,7 @@ import { auth, db } from "../lib/firebase";
 import Welcome from "../app/Welcome";
 import KYC from "../app/KYC";
 import DashboardScreen from "../app/DashboardScreen";
+import AdminAnalytics from "../app/AdminAnalytics";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -1400,6 +1401,8 @@ export default function App() {
         return <Invest />;
       case "loans":
         return <Loans />;
+      case "analytics":
+        return <AdminAnalytics onBack={() => sS("dashboard")} userData={uD} />;
       default:
         return <DashboardScreen userData={uD} userRole={uR} setCurrentScreen={sS} track={t} />;
     }
