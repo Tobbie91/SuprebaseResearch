@@ -24,3 +24,42 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Force all text to be visible and dark */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6, p, span, div, button, input, label, a, li {
+  color: #000000 !important;
+}
+
+/* White text on colored backgrounds */
+.text-white,
+[class*="text-white"] {
+  color: #FFFFFF !important;
+}
+
+/* Input placeholders */
+input::placeholder,
+textarea::placeholder {
+  color: #718096 !important;
+  opacity: 1;
+}
+
+/* Animation */
+@keyframes slide-in {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
