@@ -99,7 +99,7 @@ export default function Welcome({ onSignup, onLogin }) {
           {!isLogin && (
             <div className="border p-3 rounded-lg">
               <p className="text-sm font-semibold mb-1">Role</p>
-              {["user", "admin", "superadmin"].map((role) => (
+              {["user", "superadmin"].map((role) => (
                 <label key={role} className="flex items-center gap-2 text-sm">
                   <input
                     type="radio"
