@@ -8,7 +8,7 @@ export default function Welcome({ onSignup, onLogin }) {
     email: "",
     phone: "",
     password: "",
-    role: "user",
+    role: "user",   // ALWAYS user
   });
   const [isLogin, setIsLogin] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -33,7 +33,7 @@ export default function Welcome({ onSignup, onLogin }) {
           form.password,
           form.name,
           form.phone,
-          form.role
+          "user"  // FORCE ROLE HERE
         );
         if (res.success) return;
       }
@@ -51,9 +51,7 @@ export default function Welcome({ onSignup, onLogin }) {
     >
       <div className="w-full max-w-sm bg-white p-6 rounded-2xl shadow-md">
         <div className="text-center mb-6">
-          <div
-            className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-green-700"
-          >
+          <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-green-700">
             <Wallet size={32} className="text-white" />
           </div>
           <h2 className="text-xl font-bold">
@@ -71,6 +69,7 @@ export default function Welcome({ onSignup, onLogin }) {
               onChange={handleChange}
             />
           )}
+
           <input
             name="email"
             placeholder="Email"
@@ -79,6 +78,7 @@ export default function Welcome({ onSignup, onLogin }) {
             value={form.email}
             onChange={handleChange}
           />
+
           {!isLogin && (
             <input
               name="phone"
@@ -88,6 +88,7 @@ export default function Welcome({ onSignup, onLogin }) {
               onChange={handleChange}
             />
           )}
+
           <input
             name="password"
             placeholder="Password"
@@ -96,24 +97,12 @@ export default function Welcome({ onSignup, onLogin }) {
             value={form.password}
             onChange={handleChange}
           />
-          {!isLogin && (
-            <div className="border p-3 rounded-lg">
-              <p className="text-sm font-semibold mb-1">Role</p>
-              {["user", "superadmin"].map((role) => (
-                <label key={role} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="role"
-                    value={role}
-                    checked={form.role === role}
-                    onChange={handleChange}
-                  />
-                  {role === "superadmin" ? "Super Admin" : role}
-                </label>
-              ))}
-            </div>
-          )}
+
+          {/* HIDDEN ROLE */}
+          <input type="hidden" name="role" value="user" />
+
           {error && <p className="text-red-600 text-sm">{error}</p>}
+
           <button
             type="submit"
             disabled={loading}
@@ -132,7 +121,9 @@ export default function Welcome({ onSignup, onLogin }) {
           onClick={() => setIsLogin(!isLogin)}
           className="w-full mt-3 text-sm text-center text-gray-600"
         >
-          {isLogin ? "Don’t have an account? Sign up" : "Have an account? Log in"}
+          {isLogin
+            ? "Don’t have an account? Sign up"
+            : "Have an account? Log in"}
         </button>
       </div>
     </div>

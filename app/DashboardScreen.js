@@ -17,6 +17,10 @@ import {
   Gift,
   CheckCircle,
 } from "lucide-react";
+import useUserRole from "../lib/useUserRole";
+import { useRouter } from "next/navigation";
+import { getAuth, signOut } from "firebase/auth";
+
 
 // ✅ Use your same color palette (C) from the app
 const C = {
@@ -68,6 +72,16 @@ export default function DashboardScreen({
   track,
   onClaimToken,
 }) {
+  const { role, loading } = useUserRole();
+  const router = useRouter();
+
+  if (loading) return <p>Loading...</p>;
+
+  if (role === "superadmin") {
+    router.replace("/admin");
+    return null;
+  }
+  
   // Claim research token function
   const claimResearchToken = () => {
     if (userData.hC) {
@@ -94,15 +108,27 @@ export default function DashboardScreen({
 
   // Check if any loans are tied to ROSCA
   const roscaLoans = userData.ln?.filter(ln => ln.groupId) || [];
+  const auth = getAuth();
+
+const handleLogout = async () => {
+  try {
+    await signOut(auth);
+    router.replace("/");     // Redirect to login/welcome page
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* --- Top Banner --- */}
       <div
-        className="p-6 pb-28 text-white relative"
-        style={{
-          background: `linear-gradient(135deg, ${C.pD} 0%, ${C.p} 100%)`,
-        }}
+        className="p-6 pb-20 text-white relative"
+        // style={{
+        //   background: `linear-gradient(135deg, ${C.pD} 0%, ${C.p} 100%)`,
+        // }}
+        style={{ background: "linear-gradient(180deg, #4CC79A, #2FAF7C)" }}
       >
         <div className="flex justify-between items-center mb-8">
           <div>
@@ -120,11 +146,17 @@ export default function DashboardScreen({
           </div>
           <div className="flex gap-3">
             <Bell size={22} />
-            <User
+            {/* <User
               size={22}
               onClick={() => setCurrentScreen("profile")}
               className="cursor-pointer"
-            />
+            /> */}
+            <User
+  size={22}
+  onClick={handleLogout}
+  className="cursor-pointer"
+  title="Logout"
+/>
           </div>
         </div>
 
@@ -135,7 +167,7 @@ export default function DashboardScreen({
             ₦{(userData?.wb || 0).toLocaleString()}.00
           </h1>
           <p className="text-xs opacity-75">
-            Credit Score: {userData?.cs || 750}
+          Credit Score: {userData?.cs ?? "—"}
           </p>
           
           {/* Show if token not claimed */}
@@ -207,7 +239,7 @@ export default function DashboardScreen({
 
       {/* --- Quick Actions --- */}
       <div className={`px-6 mb-8 ${hasActiveLoans ? '' : '-mt-16'}`}>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-4 gap-3 mt-18">
           <QuickAction
             icon={<Plus size={18} />}
             label="Claim Token"
@@ -268,7 +300,7 @@ export default function DashboardScreen({
           <FeatureCard
             icon={<TrendingUp size={24} />}
             title="Invest"
-            subtitle="Explore profitable opportunities with Suprebase"
+            subtitle="Explore profitable opportunities with Ajoti"
             onClick={() => setCurrentScreen("invest")}
             color="#10B981"
           />

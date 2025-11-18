@@ -14,7 +14,21 @@ import {
 import {
   getAnalyticsSummary,
   getLoanBehaviorAnalysis,
+  getFinancialInclusionMetrics,
+  getSavingsMetrics,
+  computeCreditScore,
+  computeTrustScore,
+  getBorrowingBehavior,
+  getRoscaGroupAnalysis,
+  classifyUserBehavior, 
+  getRegularContributionRate,
+  getUnbankedUsers,
+  getTotalSavings,
+  getRoscaPoolSummary,
+  getSavingsImprovement,
 } from "../lib/analytics";
+import { getAuth, signOut } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 const C = {
   p: "#2D9B7B",
@@ -35,9 +49,47 @@ export default function AdminAnalytics({ onBack }) {
   const loadAnalytics = async () => {
     setLoading(true);
     try {
-      const summaryData = await getAnalyticsSummary();
+      const summaryData = await getAnalyticsSummary(); 
       const loanData = await getLoanBehaviorAnalysis();
-      setSummary(summaryData);
+  
+      // 🔥 NEW: Compute deeper research metrics
+      const financial = getFinancialInclusionMetrics(summaryData.actions);
+      const savings = getSavingsMetrics(summaryData.actions);
+      const borrowing = getBorrowingBehavior(summaryData.actions);
+      const roscaGroups = getRoscaGroupAnalysis(summaryData.actions);
+      const totalSavings = getTotalSavings(summaryData.actions);
+const roscaPools = getRoscaPoolSummary(summaryData.actions);
+const unbanked = getUnbankedUsers(summaryData.actions);
+const regular = getRegularContributionRate(summaryData.actions);
+const improvement = getSavingsImprovement(summaryData.actions);
+
+  
+      // 🔥 NEW: Compute trust score & credit score for ALL users
+      const userScores = {};
+      summaryData.userIds.forEach((uId) => {
+        const userActions = summaryData.actions.filter(a => a.userId === uId);
+        userScores[uId] = {
+          trustScore: computeTrustScore(userActions),
+          creditScore: computeCreditScore(userActions),
+          behaviorType: classifyUserBehavior(userActions),
+        };
+      });
+  
+      // Save all into state
+      setSummary({
+        ...summaryData,
+        financial,
+        savings,
+        borrowing,
+        roscaGroups,
+        userScores,
+        totalSavings,
+        roscaPools,
+        unbanked,
+        regular,
+        improvement,
+      });
+  
       setLoanAnalysis(loanData);
     } catch (error) {
       console.error("Failed to load analytics:", error);
@@ -45,6 +97,178 @@ export default function AdminAnalytics({ onBack }) {
     setLoading(false);
   };
 
+  const auth = getAuth();
+const router = useRouter();
+
+
+const handleLogout = async () => {
+  try {
+    await signOut(auth);
+    router.replace("/");  // redirect to login page
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
+};
+
+
+  const generatePDF = async () => {
+    const jsPDF = (await import("jspdf")).default;
+    const autoTable = (await import("jspdf-autotable")).default;
+  
+    const pdf = new jsPDF("p", "mm", "a4");
+    let y = 20;
+  
+    // ===== HEADER =====
+    pdf.setFontSize(18);
+    pdf.text("Ajoti Research Analytics Report", 14, y);
+    y += 10;
+  
+    pdf.setFontSize(11);
+    pdf.text(`Generated: ${new Date().toLocaleString()}`, 14, y);
+    y += 10;
+  
+    // ====== SECTION HELPER ======
+    const addSectionTitle = (title) => {
+      pdf.setFontSize(16);
+      pdf.text(title, 14, y);
+      y += 6;
+    };
+  
+    const addSpace = () => (y += 6);
+  
+    // ============================
+    //        1. OVERVIEW TAB
+    // ============================
+    addSectionTitle("1. Overview Metrics");
+  
+    autoTable(pdf, {
+      startY: y,
+      head: [["Metric", "Value"]],
+      body: [
+        ["Total Users", summary.totalUsers],
+        ["Token Claims", `${summary.tokenClaimRate}%`],
+        ["ROSCA Joins", summary.roscaJoins],
+        ["Total Actions", summary.totalActions],
+        ["Financial Inclusion", `${summary.financial.inclusionRate}%`],
+        ["Savings Behavior Score", summary.savings.savingsBehaviorScore],
+        ["Borrowing Frequency", summary.borrowing.borrowingFrequency],
+        ["Avg Loan Amount", `₦${summary.borrowing.avgLoanAmount.toLocaleString()}`],
+        ["Total Savings", `₦${summary.totalSavings.totalSavings.toLocaleString()}`],
+        ["Unbanked Onboarded", summary.unbanked.unbankedCount],
+        ["Regular Contributors", `${summary.regular.rate}%`],
+        ["Savings Improvement", `${summary.improvement.rate}%`],
+      ],
+    });
+  
+    y = pdf.lastAutoTable.finalY + 10;
+  
+    // ============================
+    //       2. LOAN ANALYSIS
+    // ============================
+    addSectionTitle("2. Loan Behavior Analysis");
+  
+    autoTable(pdf, {
+      startY: y,
+      head: [["Loan Metric", "Value"]],
+      body: [
+        ["Loan Prompts", loanAnalysis.totalPrompts],
+        ["Acceptance Rate", `${loanAnalysis.acceptanceRate}%`],
+        ["Loans Taken", loanAnalysis.totalAccepted],
+        ["Declined Loans", loanAnalysis.totalDeclined],
+      ],
+    });
+  
+    y = pdf.lastAutoTable.finalY + 10;
+  
+    // Loan reason breakdown
+    addSectionTitle("Loan Breakdown by Reason");
+  
+    const loanReasonRows = Object.entries(loanAnalysis.byReason).map(
+      ([reason, data]) => [
+        reason.replace(/_/g, " "),
+        data.prompted,
+        data.accepted,
+        data.declined,
+        data.prompted > 0
+          ? ((data.accepted / data.prompted) * 100).toFixed(1) + "%"
+          : "0%",
+      ]
+    );
+  
+    autoTable(pdf, {
+      startY: y,
+      head: [["Reason", "Prompted", "Accepted", "Declined", "Accept Rate"]],
+      body: loanReasonRows,
+    });
+  
+    y = pdf.lastAutoTable.finalY + 10;
+  
+    // ============================
+    //        ROSCA PERFORMANCE
+    // ============================
+    addSectionTitle("3. ROSCA Group Performance");
+  
+    const roscaRows = Object.entries(summary.roscaGroups).map(([groupId, g]) => [
+      groupId,
+      g.members,
+      `₦${g.contributions.toLocaleString()}`,
+    ]);
+  
+    autoTable(pdf, {
+      startY: y,
+      head: [["Group ID", "Members", "Total Contributions"]],
+      body: roscaRows,
+    });
+  
+    y = pdf.lastAutoTable.finalY + 10;
+  
+    // ============================
+    //        SAVINGS ANALYSIS
+    // ============================
+    addSectionTitle("4. Savings vs Borrowing Behavior");
+  
+    autoTable(pdf, {
+      startY: y,
+      head: [["Metric", "Value"]],
+      body: [
+        ["User Type: Savers", summary.financial.savers],
+        ["User Type: Borrowers", Object.values(summary.userScores).filter((u) => u.behaviorType === "Borrower").length],
+        ["User Type: Balanced", Object.values(summary.userScores).filter((u) => u.behaviorType === "Balanced").length],
+        ["Average Credit Score", Math.round(Object.values(summary.userScores).reduce((sum, s) => sum + s.creditScore, 0) / summary.totalUsers)],
+      ],
+    });
+  
+    y = pdf.lastAutoTable.finalY + 10;
+  
+    // ============================
+    //        INDIVIDUAL USER SCORES
+    // ============================
+    addSectionTitle("5. User Trust & Credit Scores");
+  
+    const userRows = summary.userIds.map((id) => {
+      const s = summary.userScores[id];
+      const u = summary.userMap[id] || {};
+      return [
+        u.name || "Unnamed",
+        u.email || "",
+        s.trustScore,
+        s.creditScore,
+        s.behaviorType,
+      ];
+    });
+  
+    autoTable(pdf, {
+      startY: y,
+      head: [["Name", "Email", "Trust Score", "Credit Score", "Type"]],
+      body: userRows,
+    });
+  
+    // ============================
+    //        FINALIZE PDF
+    // ============================
+    pdf.save("ajoti-full-analytics.pdf");
+  };
+  
   const StatCard = ({ icon, label, value, subtitle, color = C.p }) => (
     <div className="bg-white p-5 rounded-xl shadow-sm border">
       <div className="flex items-start justify-between mb-3">
@@ -75,7 +299,7 @@ export default function AdminAnalytics({ onBack }) {
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
-      <div
+      {/* <div
         className="p-6 text-white"
         style={{ background: `linear-gradient(135deg, ${C.pD}, ${C.p})` }}
       >
@@ -85,7 +309,40 @@ export default function AdminAnalytics({ onBack }) {
         </button>
         <h1 className="text-2xl font-bold mb-2">📊 Research Analytics</h1>
         <p className="text-sm opacity-90">Real-time behavior tracking & insights</p>
-      </div>
+      </div> */}
+{/* Header */}
+<div
+  className="p-6 text-white relative"
+  style={{ background: `linear-gradient(135deg, ${C.pD}, ${C.p})` }}
+>
+  {/* BACK BUTTON */}
+  <button onClick={onBack} className="mb-4 flex items-center gap-2">
+    <ArrowLeft size={20} />
+    <span>Back</span>
+  </button>
+
+  {/* TOP RIGHT ACTION BUTTONS */}
+  <div className="absolute top-6 right-6 flex items-center gap-3">
+    {/* EXPORT BUTTON */}
+    <button
+      onClick={generatePDF}
+      className="bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold hover:bg-white/30"
+    >
+      Export PDF
+    </button>
+
+    {/* LOGOUT BUTTON */}
+    <button
+      onClick={handleLogout}
+      className="bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold hover:bg-white/30"
+    >
+      Logout
+    </button>
+  </div>
+
+  <h1 className="text-2xl font-bold mb-2">📊 Research Analytics</h1>
+  <p className="text-sm opacity-90">Real-time behavior tracking & insights</p>
+</div>
 
       {/* Tabs */}
       <div className="bg-white border-b px-6 py-3 flex gap-4 overflow-x-auto">
@@ -154,6 +411,69 @@ export default function AdminAnalytics({ onBack }) {
                   subtitle="All tracked events"
                   color="#8B5CF6"
                 />
+                <StatCard
+  icon={<Users />}
+  label="Financial Inclusion"
+  value={`${summary.financial.inclusionRate}%`}
+  subtitle={`${summary.financial.savers}/${summary.financial.totalUsers} active savers`}
+  color="#22C55E"
+/>
+
+<StatCard
+  icon={<TrendingUp />}
+  label="Savings Behavior Score"
+  value={summary.savings.savingsBehaviorScore}
+  subtitle="Based on fixed savings, targets & investments"
+  color="#6366F1"
+/>
+
+<StatCard
+  icon={<DollarSign />}
+  label="Borrowing Frequency"
+  value={summary.borrowing.borrowingFrequency}
+  subtitle="Loans taken"
+  color="#EC4899"
+/>
+
+<StatCard
+  icon={<TrendingUp />}
+  label="Average Loan Amount"
+  value={`₦${summary.borrowing.avgLoanAmount.toLocaleString()}`}
+  subtitle="Across all users"
+  color="#0EA5E9"
+/>
+<StatCard
+  icon={<DollarSign />}
+  label="Total Savings"
+  value={`₦${summary.totalSavings.totalSavings.toLocaleString()}`}
+  subtitle={`${summary.totalSavings.count} saving actions`}
+  color="#16A34A"
+/>
+
+<StatCard
+  icon={<Users />}
+  label="Unbanked Onboarded"
+  value={summary.unbanked.unbankedCount}
+  subtitle="Saved without bank accounts"
+  color="#EF4444"
+/>
+
+<StatCard
+  icon={<TrendingUp />}
+  label="Regular Contributors"
+  value={`${summary.regular.rate}%`}
+  subtitle={`${summary.regular.regulars} frequent savers`}
+  color="#0EA5E9"
+/>
+
+<StatCard
+  icon={<TrendingUp />}
+  label="Savings Behavior Improvement"
+  value={`${summary.improvement.rate}%`}
+  subtitle={`${summary.improvement.improvedUsers} improved`}
+  color="#8B5CF6"
+/>
+
               </div>
             </div>
 
@@ -248,6 +568,18 @@ export default function AdminAnalytics({ onBack }) {
                             <span className="font-semibold text-red-600">{data.declined}</span>
                           </div>
                         </div>
+                        <div className="bg-white p-5 rounded-xl shadow-sm border">
+  <h3 className="font-bold mb-4">ROSCA Group Performance</h3>
+
+  {Object.entries(summary.roscaGroups).map(([groupId, data]) => (
+    <div key={groupId} className="border-b py-3">
+      <p className="font-semibold text-sm">Group: {groupId}</p>
+      <p className="text-xs text-gray-600">Members: {data.members}</p>
+      <p className="text-xs text-gray-600">Total Contributions: ₦{data.contributions.toLocaleString()}</p>
+    </div>
+  ))}
+</div>
+
                       </div>
                     );
                   })}
@@ -381,85 +713,237 @@ export default function AdminAnalytics({ onBack }) {
                   </ol>
                 </div>
               </div>
+              <div className="bg-white p-5 rounded-xl shadow-sm border">
+  <h3 className="font-bold mb-4">User Trust & Credit Scores</h3>
+
+  <div className="grid grid-cols-2 gap-4">
+    {Object.entries(summary.userScores).map(([userId, score]) => (
+      <div key={userId} className="p-3 border rounded-lg">
+        <p className="text-xs text-gray-500 mb-1">  User: {summary.userMap[userId]?.name || userId}</p>
+        <p className="text-sm font-semibold">
+          Trust Score: <span className="text-green-700">{score.trustScore}</span>
+        </p>
+        <p className="text-sm font-semibold">
+          Credit Score: <span className="text-blue-700">{score.creditScore}</span>
+        </p>
+        <p className="text-xs text-gray-600 mt-1">
+          Type: {score.behaviorType}
+        </p>
+      </div>
+    ))}
+  </div>
+</div>
+
             </div>
           </>
         )}
 
         {/* USERS TAB */}
-        {selectedTab === "users" && (
-          <>
-            <div>
-              <h2 className="font-bold text-lg mb-4">Research Guidelines & Data Export</h2>
-              
-              <div className="bg-white p-5 rounded-xl shadow-sm border mb-4">
-                <h3 className="font-bold mb-3">📝 How to Use This Data for Research Papers</h3>
-                <div className="space-y-4 text-sm">
-                  <div>
-                    <p className="font-semibold text-green-700 mb-2">1. Export Raw Data</p>
-                    <p className="text-xs text-gray-600">
-                      Click "Export All Data" below to download CSV files containing all tracked events. Import into SPSS, R, Excel, or Python for analysis.
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <p className="font-semibold text-green-700 mb-2">2. Key Variables to Analyze</p>
-                    <ul className="text-xs text-gray-600 space-y-1 list-disc pl-5">
-                      <li><strong>Dependent Variable:</strong> Loan acceptance (binary: yes/no)</li>
-                      <li><strong>Independent Variables:</strong> User balance, ROSCA membership, previous loans, savings amount</li>
-                      <li><strong>Contextual Variables:</strong> Loan purpose, prompt frequency, time of day</li>
-                    </ul>
-                  </div>
+        {selectedTab === "users" && summary && (
+  <>
+    <div>
+      <h2 className="font-bold text-lg mb-4">User Insights</h2>
 
-                  <div>
-                    <p className="font-semibold text-green-700 mb-2">3. Statistical Tests to Run</p>
-                    <ul className="text-xs text-gray-600 space-y-1 list-disc pl-5">
-                      <li><strong>Logistic Regression:</strong> Predict loan acceptance based on user characteristics</li>
-                      <li><strong>Chi-Square Test:</strong> Association between ROSCA membership and loan behavior</li>
-                      <li><strong>T-Tests:</strong> Compare savers vs borrowers on key metrics</li>
-                      <li><strong>ANOVA:</strong> Compare loan acceptance across different contexts (ROSCA, target, investment)</li>
-                    </ul>
-                  </div>
+      {/* SUMMARY CARDS */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <StatCard
+          icon={<Users />}
+          label="Total Users"
+          value={summary.totalUsers}
+          subtitle="Active participants"
+          color="#3B82F6"
+        />
+        <StatCard
+          icon={<DollarSign />}
+          label="Token Claimers"
+          value={summary.tokenClaims}
+          subtitle="Claimed Research Token"
+          color="#10B981"
+        />
+        <StatCard
+          icon={<TrendingUp />}
+          label="Savers"
+          value={summary.financial.savers}
+          subtitle="Created savings actions"
+          color="#22C55E"
+        />
+        <StatCard
+          icon={<AlertCircle />}
+          label="Borrowers"
+          value={Object.values(summary.userScores).filter(u => u.behaviorType === "Borrower").length}
+          subtitle="Users who took loans"
+          color="#EF4444"
+        />
+        <StatCard
+          icon={<TrendingUp />}
+          label="Balanced Users"
+          value={Object.values(summary.userScores).filter(u => u.behaviorType === "Balanced").length}
+          subtitle="Mixed borrowing & saving"
+          color="#8B5CF6"
+        />
+        <StatCard
+          icon={<TrendingUp />}
+          label="Avg Credit Score"
+          value={
+            Math.round(
+              Object.values(summary.userScores).reduce((a, b) => a + b.creditScore, 0) /
+              summary.totalUsers
+            )
+          }
+          subtitle="Across all users"
+          color="#0EA5E9"
+        />
+      </div>
 
-                  <div>
-                    <p className="font-semibold text-green-700 mb-2">4. Research Questions This Data Answers</p>
-                    <ul className="text-xs text-gray-600 space-y-1 list-disc pl-5">
-                      <li>What factors predict loan acceptance in fintech platforms?</li>
-                      <li>Does ROSCA participation increase or decrease borrowing behavior?</li>
-                      <li>How does frequent loan prompting affect user decision-making?</li>
-                      <li>What financial products drive the most engagement in African markets?</li>
-                      <li>Do community-based savings (ROSCA) outperform individual savings?</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
+      {/* USER TABLE */}
+      {/* <div className="bg-white p-5 rounded-xl shadow-sm border">
+        <h3 className="font-bold mb-4">User Activity Overview</h3>
 
-              <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 p-6 rounded-xl text-white mb-4">
-                <h3 className="font-bold text-lg mb-2">🎯 Sample Research Paper Outline</h3>
-                <div className="text-sm space-y-2 opacity-90">
-                  <p><strong>Title:</strong> "Behavioral Patterns in Digital Lending: A Study of Loan Acceptance in African Fintech"</p>
-                  <p><strong>Abstract:</strong> This study examines loan acceptance behavior among 200 users...</p>
-                  <p><strong>Methodology:</strong> Mixed-methods study using behavioral tracking over 6 weeks...</p>
-                  <p><strong>Key Findings:</strong> {loanAnalysis?.acceptanceRate || 'X'}% loan acceptance rate, context-dependent borrowing...</p>
-                  <p><strong>Implications:</strong> Financial inclusion, credit accessibility, debt cycles...</p>
-                </div>
-              </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left">
+              <th className="py-2">User</th>
+              <th>Email</th>
+              <th>Behavior</th>
+              <th>Trust</th>
+              <th>Credit</th>
+              <th>ROSCA</th>
+              <th>Loans</th>
+              <th>Savings</th>
+              <th className="text-right">Details</th>
+            </tr>
+          </thead>
 
-              <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-5">
-                <h3 className="font-bold text-orange-900 mb-3">⚠️ Research Ethics & Privacy</h3>
-                <ul className="text-xs text-orange-800 space-y-2">
-                  <li>✅ All data is anonymized - no personally identifiable information (PII) in exports</li>
-                  <li>✅ Users consented to research participation during signup</li>
-                  <li>✅ Data stored securely in Firebase with encryption</li>
-                  <li>✅ Only aggregated data should be published (no individual user profiles)</li>
-                  <li>✅ Cite as: "User study conducted via Suprebase fintech research platform, 2025"</li>
-                </ul>
-              </div>
-            </div>
-          </>
-        )}
+          <tbody>
+            {summary.userIds.map((userId) => {
+              const score = summary.userScores[userId];
+              const user = summary.userMap[userId] || {};
+              const roscaCount = summary.actions.filter(a => a.userId === userId && a.actionType === "rosca_join").length;
+              const loanCount = summary.actions.filter(a => a.userId === userId && a.actionType === "loan_taken").length;
+              const saveCount = summary.actions.filter(a => 
+                ["fixed_savings_locked","target_contribution","investment_made"].includes(a.actionType)
+              ).length;
+
+              return (
+                <tr key={userId} className="border-b">
+                  <td className="py-2">{user.name || "Unnamed"}</td>
+                  <td>{user.email}</td>
+                  <td>{score.behaviorType}</td>
+                  <td>{score.trustScore}</td>
+                  <td>{score.creditScore}</td>
+                  <td>{roscaCount}</td>
+                  <td>{loanCount}</td>
+                  <td>{saveCount}</td>
+                  <td className="text-right">
+                    <button
+                      onClick={() => alert(`User details coming soon for ${userId}`)}
+                      className="text-green-700 font-semibold"
+                    >
+                      View →
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div> */}
+      {/* USERS LIST — MOBILE ONLY */}
+<div className="space-y-4">
+  {summary.userIds.map((userId) => {
+    const score = summary.userScores[userId];
+    const user = summary.userMap[userId] || {};
+
+    const roscaCount = summary.actions.filter(
+      (a) => a.userId === userId && a.actionType === "rosca_join"
+    ).length;
+
+    const loanCount = summary.actions.filter(
+      (a) => a.userId === userId && a.actionType === "loan_taken"
+    ).length;
+
+    const saveCount = summary.actions.filter((a) =>
+      ["fixed_savings_locked", "target_contribution", "investment_made"].includes(
+        a.actionType
+      )
+    ).length;
+
+    return (
+      <div
+        key={userId}
+        className="bg-white rounded-xl p-4 shadow-sm border border-gray-200"
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center mb-3">
+          <div>
+            <p className="font-semibold text-base">{user.name || "Unnamed User"}</p>
+            <p className="text-xs text-gray-600">{user.email}</p>
+          </div>
+
+          <button
+            onClick={() => alert(`User details coming soon for ${userId}`)}
+            className="text-green-700 text-sm font-semibold"
+          >
+            View →
+          </button>
+        </div>
+
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-2 gap-3 text-xs text-gray-700">
+          <p>
+            <span className="font-semibold">Behavior:</span> {score.behaviorType}
+          </p>
+          <p>
+            <span className="font-semibold">Trust:</span>{" "}
+            <span className="text-green-700">{score.trustScore}</span>
+          </p>
+
+          <p>
+            <span className="font-semibold">Credit:</span>{" "}
+            <span className="text-blue-700">{score.creditScore}</span>
+          </p>
+
+          <p>
+            <span className="font-semibold">ROSCA Joined:</span> {roscaCount}
+          </p>
+
+          <p>
+            <span className="font-semibold">Loans Taken:</span> {loanCount}
+          </p>
+
+          <p>
+            <span className="font-semibold">Savings:</span> {saveCount}
+          </p>
+        </div>
+      </div>
+    );
+  })}
+</div>
+
+    </div>
+
+    {/* EXPORT */}
+    {/* <button
+      onClick={() => alert("Export coming soon")}
+      className="w-full py-4 rounded-xl mt-6 font-semibold text-white"
+      style={{ backgroundColor: C.p }}
+    >
+      <Download size={20} className="inline mr-2" />
+      Export All Data (CSV)
+    </button> */}
+    <button
+  onClick={generatePDF}
+  className="w-full py-3 mt-4 rounded-xl font-semibold text-white bg-green-700"
+>
+  Export Analytics (PDF)
+</button>
+
+  </>
+)}
+
 
         {/* Export Data Button */}
-        <button
+        {/* <button
           onClick={() => {
             alert("📊 Export feature coming soon!\n\nWill export all data to CSV for analysis.");
           }}
@@ -468,7 +952,7 @@ export default function AdminAnalytics({ onBack }) {
         >
           <Download size={20} />
           Export All Data (CSV)
-        </button>
+        </button> */}
       </div>
     </div>
   );

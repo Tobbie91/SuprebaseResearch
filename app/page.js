@@ -52,6 +52,8 @@ const C = {
   da: "#FC8181",
 };
 
+
+
 // ===== REAL ROSCA GROUPS (30+ groups for 200 users) =====
 const INITIAL_ROSCA_GROUPS = [
   // Weekly 3K Groups (Budget friendly - 12 groups)
@@ -217,26 +219,8 @@ const FS = [
 export default function App() {
   const [s, sS] = useState("splash");
   const [uR, sUR] = useState("user");
-  const [uD, sUD] = useState({
-    id: Math.random().toString(36).substr(2, 9),
-    name: "Test User",
-    email: "",
-    phone: "",
-    wb: 0, // Starts at 0 - must claim research token
-    at: 0,
-    hC: false, // Has claimed research token
-    hK: false,
-    cs: 750,
-    role: "user",
-    jG: [], // Joined groups with payout info
-    gR: [], // Group requests
-    ln: [], // Active loans
-    fS: [], // Fixed savings
-    tS: [], // Target savings
-    inv: [], // Investments
-    tr: [], // Transactions
-    lnP: [], // Loan prompts shown
-  });
+  
+  const [uD, sUD] = useState(null);
   const [aG, sAG] = useState([...INITIAL_ROSCA_GROUPS]);
   const [sG, sSG] = useState(null);
   const [sI, sSI] = useState(null);
@@ -244,6 +228,21 @@ export default function App() {
   const [sL, sSL] = useState(false);
   const [showLoanPrompt, setShowLoanPrompt] = useState(false);
   const [promptedGroup, setPromptedGroup] = useState(null);
+
+  const t = async (action, data = {}) => {
+    console.log("📊 Tracking:", action, data);
+  
+    if (!uD) return;
+  
+    try {
+      await trackAction(uD.id, uD.name, uD.email, action, {
+        ...data,
+        screen: s,
+      });
+    } catch (err) {
+      console.error("Tracking failed:", err);
+    }
+  };
 
   // ===== Firebase Auth =====
   useEffect(() => {
@@ -268,38 +267,35 @@ export default function App() {
   }, [s]);
 
   // ===== SIMULATION: Groups fill up with other users =====
-  useEffect(() => {
-    const interval = setInterval(() => {
-      sAG((prevGroups) =>
-        prevGroups.map((g) => {
-          // 20% chance someone joins if group not full
-          if (g.c < g.m && Math.random() > 0.8) {
-            return { ...g, c: g.c + 1 };
-          }
-          return g;
-        })
-      );
-    }, 15000); // Every 15 seconds
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     sAG((prevGroups) =>
+  //       prevGroups.map((g) => {
+  //         // 20% chance someone joins if group not full
+  //         if (g.c < g.m && Math.random() > 0.8) {
+  //           return { ...g, c: g.c + 1 };
+  //         }
+  //         return g;
+  //       })
+  //     );
+  //   }, 15000); // Every 15 seconds
 
-    return () => clearInterval(interval);
-  }, []);
+  //   return () => clearInterval(interval);
+  // }, []);
 
   // ===== ROSCA WEEKLY DEDUCTION SIMULATION =====
   useEffect(() => {
-    // Check for weekly deductions (simulate every 30 seconds for testing)
-    const deductionInterval = setInterval(() => {
+    if (!uD || !uD.jG) return;
+  
+    const interval = setInterval(() => {
       uD.jG.forEach((joinedGroup) => {
         processWeeklyDeduction(joinedGroup);
       });
-    }, 30000); // Every 30 seconds for testing (would be weekly in production)
-
-    return () => clearInterval(deductionInterval);
-  }, [uD.jG]);
-
-  const t = async (a, d = {}) => {
-    console.log("📊", a, d);
-    await trackAction(uD.id, uD.name, uD.email, a, { ...d, screen: s });
-  };
+    }, 15000); // runs every 15 seconds for testing
+  
+    return () => clearInterval(interval);
+  }, [uD?.jG]);
+  
 
   const svD = async (u) => {
     const newData = { ...uD, ...u };
@@ -386,16 +382,24 @@ export default function App() {
     }
 
     // Check wallet balance
+    // if (uD.wb < g.a) {
+    //   // Offer loan
+    //   setPromptedGroup(g);
+    //   setShowLoanPrompt(true);
+    //   return;
+    // }
     if (uD.wb < g.a) {
-      // Offer loan
-      setPromptedGroup(g);
-      setShowLoanPrompt(true);
+      if (uR !== "superadmin") {
+        setPromptedGroup(g);
+        setShowLoanPrompt(true);
+      }
       return;
     }
+    
 
     // Join group successfully
     const position = g.c + 1; // Their payout position
-    const payoutWeek = position; // Week they'll receive payout
+    const payoutWeek = null; 
     const totalPayout = g.a * g.m; // Total they'll receive
 
     const uG = aG.map((gr) => (gr.id === g.id ? { ...gr, c: gr.c + 1 } : gr));
@@ -403,18 +407,31 @@ export default function App() {
 
     svD({
       wb: uD.wb - g.a, // Deduct first contribution
+      // jG: [
+      //   ...uD.jG,
+      //   {
+      //     ...g,
+      //     jAt: new Date().toISOString(),
+      //     pos: position,
+      //     payoutWeek,
+      //     totalPayout,
+      //     weeksPaid: 1,
+      //     nextDeduction: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      //   },
+      // ],
       jG: [
         ...uD.jG,
         {
           ...g,
           jAt: new Date().toISOString(),
           pos: position,
-          payoutWeek,
+          payoutWeek: null,
           totalPayout,
-          weeksPaid: 1,
-          nextDeduction: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          weeksPaid: 0,
+          nextDeduction: null,
         },
       ],
+      
       gR: uD.gR.filter((r) => r.id !== g.id),
     });
 
@@ -425,7 +442,10 @@ export default function App() {
 
   // ===== ROSCA: Weekly Deduction =====
   const processWeeklyDeduction = (joinedGroup) => {
+    if (!joinedGroup.nextDeduction) return;
+
     const nextDeductionDate = new Date(joinedGroup.nextDeduction);
+    if (isNaN(nextDeductionDate)) return;
     if (new Date() >= nextDeductionDate && joinedGroup.weeksPaid < joinedGroup.m) {
       if (uD.wb >= joinedGroup.a) {
         // Deduct successfully
@@ -450,15 +470,35 @@ export default function App() {
     }
 
     // Process payout if it's their week
-    if (joinedGroup.weeksPaid === joinedGroup.pos && !joinedGroup.paid) {
-      svD({
-        wb: uD.wb + joinedGroup.totalPayout,
-        jG: uD.jG.map(jg =>
-          jg.id === joinedGroup.id ? { ...jg, paid: true } : jg
-        ),
-      });
-      alert(`🎉 ROSCA Payout! You received ₦${joinedGroup.totalPayout.toLocaleString()} from ${joinedGroup.n}`);
-    }
+   // payout happens in the week equal to payoutWeek  
+if (
+  joinedGroup.weeksPaid === joinedGroup.payoutWeek &&
+  !joinedGroup.paid
+) {
+  let payoutAmount = joinedGroup.totalPayout;
+
+  // deduct loan against this group FIRST
+  const loan = uD.ln.find(l => l.groupId === joinedGroup.id);
+
+  if (loan) {
+    payoutAmount -= loan.tot;
+
+    svD({
+      ln: uD.ln.filter(l => l.id !== loan.id), // loan cleared
+    });
+  }
+
+  // add payout to wallet
+  svD({
+    wb: uD.wb + payoutAmount,
+    jG: uD.jG.map(jg =>
+      jg.id === joinedGroup.id
+        ? { ...jg, paid: true }
+        : jg
+    ),
+  });
+}
+
   };
 
   // ===== LOANS =====
@@ -536,10 +576,12 @@ export default function App() {
   const Splash = () => (
     <div
       className="min-h-screen flex flex-col items-center justify-center p-6"
-      style={{ background: `linear-gradient(180deg,${C.pD},${C.p})` }}
+      // style={{ background: `linear-gradient(180deg,${C.pD},${C.p})` }}
+      style={{ background: "linear-gradient(180deg, #4CC79A, #2FAF7C)" }}
+
     >
       <div className="text-center text-white">
-        <h1 className="text-5xl font-bold mb-6">Supreb⊗se</h1>
+        <h1 className="text-5xl font-bold mb-6">Ajoti</h1>
         <div className="w-16 h-1 bg-white mx-auto mb-6" />
         <p className="text-sm opacity-90">Fintech Research Platform</p>
         <p className="text-xs opacity-75 mt-2">Testing Financial Behaviors</p>
@@ -551,7 +593,8 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 pb-20">
       <div
         className="p-6 text-white rounded-b-3xl"
-        style={{ background: `linear-gradient(135deg,${C.pD},${C.p})` }}
+        // style={{ background: `linear-gradient(135deg,${C.pD},${C.p})` }}
+        style={{ background: "linear-gradient(180deg, #4CC79A, #2FAF7C)" }}
       >
         <h2 className="text-2xl font-bold mb-2">ROSCA Groups</h2>
         <p className="text-sm opacity-90 mb-4">Join trusted rotating savings groups</p>
@@ -1379,16 +1422,19 @@ export default function App() {
         return <Welcome onSignup={hSU} onLogin={hLI} />;
       case "kyc":
         return <KYC onComplete={() => sS("dashboard")} saveData={svD} />;
-      case "dashboard":
-        return (
-          <DashboardScreen
-            userData={uD}
-            userRole={uR}
-            setCurrentScreen={sS}
-            track={t}
-            onClaimToken={claimToken}
-          />
-        );
+        case "dashboard":
+          if (uR === "superadmin") return <AdminAnalytics onBack={() => sS("dashboard")} userData={uD} />;
+          // if (uR === "superadmin") return <AdminAnalytics userData={uD} />;
+          return (
+            <DashboardScreen
+              userData={uD}
+              userRole={uR}
+              setCurrentScreen={sS}
+              track={t}
+              onClaimToken={claimToken}
+            />
+          );
+        
       case "rosca":
         return <Rosca />;
       case "rosca-detail":
