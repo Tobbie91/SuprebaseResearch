@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Gift,
   CheckCircle,
+  // ArrowLeftRight removed - not needed anymore
 } from "lucide-react";
 import useUserRole from "../lib/useUserRole";
 import { useRouter } from "next/navigation";
@@ -64,6 +65,52 @@ const FeatureCard = ({ icon, title, subtitle, onClick, color = C.p }) => (
   </div>
 );
 
+// ===== CURRENCY SELECTOR COMPONENT =====
+const CurrencySelector = ({ userData, onCurrencyChange }) => {
+  const currencies = [
+    { code: 'NGN', symbol: '₦', name: 'Naira' },
+    { code: 'USD', symbol: '$', name: 'Dollar' },
+    { code: 'EUR', symbol: '€', name: 'Euro' },
+    { code: 'GBP', symbol: '£', name: 'Pound' },
+  ];
+
+  const selectedCurrency = userData?.selectedCurrency || 'NGN';
+  const wallets = userData?.wallets || { NGN: 0, USD: 0, EUR: 0, GBP: 0 };
+
+  return (
+    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 mb-3">
+      <p className="text-xs opacity-75 mb-2">Available Currencies</p>
+      <div className="grid grid-cols-4 gap-2">
+        {currencies.map((curr) => {
+          const isSelected = selectedCurrency === curr.code;
+          const balance = wallets[curr.code] || 0;
+          
+          return (
+            <button
+              key={curr.code}
+              onClick={() => onCurrencyChange(curr.code)}
+              className={`p-2 rounded-lg transition-all ${
+                isSelected
+                  ? 'bg-white/30 border-2 border-white'
+                  : 'bg-white/10 border border-white/20 hover:bg-white/20'
+              }`}
+            >
+              <div className="text-center text-white">
+                <p className="text-lg font-bold">{curr.symbol}</p>
+                <p className="text-[9px] font-semibold opacity-90">{curr.code}</p>
+                <p className={`text-[10px] font-bold mt-0.5 ${isSelected ? '' : 'opacity-70'}`}>
+                  {balance.toLocaleString()}
+                </p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+
 // ✅ Full DashboardScreen Component
 export default function DashboardScreen({
   userData,
@@ -71,6 +118,7 @@ export default function DashboardScreen({
   setCurrentScreen,
   track,
   onClaimToken,
+  saveUserData,
 }) {
   const { role, loading } = useUserRole();
   const router = useRouter();
@@ -110,14 +158,14 @@ export default function DashboardScreen({
   const roscaLoans = userData.ln?.filter(ln => ln.groupId) || [];
   const auth = getAuth();
 
-const handleLogout = async () => {
-  try {
-    await signOut(auth);
-    router.replace("/");     // Redirect to login/welcome page
-  } catch (error) {
-    console.error("Logout error:", error);
-  }
-};
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.replace("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
 
 
   return (
@@ -125,9 +173,6 @@ const handleLogout = async () => {
       {/* --- Top Banner --- */}
       <div
         className="p-6 pb-20 text-white relative"
-        // style={{
-        //   background: `linear-gradient(135deg, ${C.pD} 0%, ${C.p} 100%)`,
-        // }}
         style={{ background: "linear-gradient(180deg, #4CC79A, #2FAF7C)" }}
       >
         <div className="flex justify-between items-center mb-8">
@@ -146,35 +191,50 @@ const handleLogout = async () => {
           </div>
           <div className="flex gap-3">
             <Bell size={22} />
-            {/* <User
-              size={22}
-              onClick={() => setCurrentScreen("profile")}
-              className="cursor-pointer"
-            /> */}
             <User
-  size={22}
-  onClick={handleLogout}
-  className="cursor-pointer"
-  title="Logout"
-/>
+              size={22}
+              onClick={handleLogout}
+              className="cursor-pointer"
+              title="Logout"
+            />
           </div>
         </div>
 
         {/* Wallet */}
         <div className="bg-white/20 backdrop-blur-md rounded-2xl p-5 text-center relative z-10">
           <p className="text-sm opacity-90 mb-1">Wallet Balance</p>
-          <h1 className="text-4xl font-bold mb-2">
-            ₦{(userData?.wb || 0).toLocaleString()}.00
-          </h1>
-          <p className="text-xs opacity-75">
-          Credit Score: {userData?.cs ?? "—"}
-          </p>
           
-          {/* Show if token not claimed */}
+          {/* 💱 SHOW SELECTED CURRENCY BALANCE */}
+          <h1 className="text-4xl font-bold mb-2">
+            {(() => {
+              const selectedCurrency = userData?.selectedCurrency || 'NGN';
+              const wallets = userData?.wallets || { NGN: userData?.wb || 0, USD: 0, EUR: 0, GBP: 0 };
+              const balance = wallets[selectedCurrency] || 0;
+              const symbols = { NGN: '₦', USD: '$', EUR: '€', GBP: '£' };
+              
+              return `${symbols[selectedCurrency]}${balance.toLocaleString()}`;
+            })()}
+          </h1>
+          
+          <p className="text-xs opacity-75 mb-4">
+            Credit Score: {userData?.cs ?? "—"}
+          </p>
+
+          {/* 💱 CURRENCY SELECTOR */}
+          <CurrencySelector 
+            userData={userData} 
+            onCurrencyChange={(currency) => {
+              if (saveUserData) {
+                saveUserData({ selectedCurrency: currency });
+              }
+            }} 
+          />
+          
+          {/* Token claim button */}
           {!userData?.hC && (
             <button
               onClick={claimResearchToken}
-              className="mt-4 bg-yellow-400 text-yellow-900 px-6 py-2 rounded-full text-sm font-bold flex items-center gap-2 mx-auto hover:bg-yellow-300 transition shadow-lg animate-pulse"
+              className="mt-3 bg-yellow-400 text-yellow-900 px-6 py-2 rounded-full text-sm font-bold flex items-center gap-2 mx-auto hover:bg-yellow-300 transition shadow-lg animate-pulse"
             >
               <Gift size={16} />
               Claim ₦100,000 Research Token
@@ -187,6 +247,29 @@ const handleLogout = async () => {
               <span>Research token claimed</span>
             </div>
           )}
+
+          {/* 🌱 INITIALIZE GROUPS DATABASE - ONE-TIME SETUP */}
+{/* 🔄 REFRESH GROUPS BUTTON - For all users */}
+<button
+  onClick={async () => {
+    try {
+      if (window.loadGroupsFromFirebase) {
+        console.log("🔄 User manually refreshing groups...");
+        await window.loadGroupsFromFirebase();
+        alert("✅ Groups refreshed! You should now see updated member counts.");
+      } else {
+        alert("❌ Refresh function not available. Please refresh the page.");
+      }
+    } catch (error) {
+      console.error("Refresh error:", error);
+      alert(`❌ Error: ${error.message}`);
+    }
+  }}
+  className="mt-3 bg-blue-500 text-white px-6 py-3 rounded-full text-sm font-bold flex items-center gap-2 mx-auto hover:bg-blue-600 transition shadow-lg"
+>
+  <span className="text-lg">🔄</span>
+  Refresh Groups
+</button>
         </div>
       </div>
 
@@ -321,6 +404,8 @@ const handleLogout = async () => {
             color="#06B6D4"
           />
         </div>
+
+        
       </div>
 
       {/* --- Research Analytics for Super Admin --- */}
