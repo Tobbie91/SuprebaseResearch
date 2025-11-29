@@ -47,7 +47,8 @@ import {
   getRoscaPoolSummary,
   getSavingsImprovement,
 } from "../lib/analytics";
-import { getAuth, signOut } from "firebase/auth";
+import { auth } from "../lib/firebase";
+import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 const C = {
@@ -85,7 +86,6 @@ export default function AdminAnalytics({ onBack }) {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  const auth = getAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -550,7 +550,7 @@ export default function AdminAnalytics({ onBack }) {
 
       {/* Tabs */}
       <div className="bg-white border-b px-6 py-3 flex gap-4 overflow-x-auto">
-        {["overview", "charts", "loans", "savings", "users"].map((tab) => (
+        {["overview", "borrowing", "rosca", "charts", "users"].map((tab) => (
           <button
             key={tab}
             onClick={() => setSelectedTab(tab)}
@@ -560,7 +560,7 @@ export default function AdminAnalytics({ onBack }) {
                 : "border-transparent text-gray-500"
             }`}
           >
-            {tab}
+            {tab === "rosca" ? "ROSCA Analysis" : tab}
           </button>
         ))}
       </div>
@@ -779,29 +779,6 @@ export default function AdminAnalytics({ onBack }) {
                 📊 Observed Data Visualizations
               </h2>
 
-              {/* Daily Signups */}
-              <div className="bg-white p-5 rounded-xl shadow-sm border mb-6">
-                <h3 className="font-bold mb-4">
-                  Daily User Registrations (Actual)
-                </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={chartData.dailySignups}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="count"
-                      stroke="#2D9B7B"
-                      strokeWidth={2}
-                      name="New Users"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
               {/* Behavior Distribution */}
               <div className="bg-white p-5 rounded-xl shadow-sm border mb-6">
                 <h3 className="font-bold mb-4">
@@ -1002,6 +979,580 @@ export default function AdminAnalytics({ onBack }) {
                   </p>
                 </div>
               </div>
+            </div>
+          </>
+        )}
+
+        {/* BORROWING TAB - RESEARCH FOCUSED */}
+        {selectedTab === "borrowing" && summary && loanAnalysis && (
+          <>
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl p-6">
+                <h2 className="font-bold text-lg mb-2 text-purple-900">
+                  📊 Borrowing Behavior Research Summary
+                </h2>
+                <p className="text-sm text-purple-800">
+                  Comprehensive analysis of loan acceptance, rejection patterns, and creditworthiness indicators.
+                </p>
+              </div>
+
+              {(() => {
+                const borrowerIds = new Set(
+                  summary.actions.filter(a => a.actionType === "loan_taken").map(a => a.userId)
+                );
+                const declinedIds = new Set(
+                  summary.actions.filter(a => a.actionType === "loan_decision" && a.metadata.decision === "declined").map(a => a.userId)
+                );
+                const nonBorrowerIds = summary.userIds.filter(id => !borrowerIds.has(id));
+
+                // Check if we have data
+                if (borrowerIds.size === 0 && declinedIds.size === 0) {
+                  return (
+                    <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-8 text-center">
+                      <AlertCircle size={48} className="mx-auto mb-4 text-yellow-600" />
+                      <h3 className="font-bold text-lg text-yellow-900 mb-2">No Borrowing Data Yet</h3>
+                      <p className="text-sm text-yellow-800 mb-4">
+                        This section will populate once users interact with loan offers in the app.
+                      </p>
+                      <div className="text-left max-w-md mx-auto bg-white p-4 rounded-lg">
+                        <p className="text-xs font-semibold text-gray-700 mb-2">Data will include:</p>
+                        <ul className="text-xs text-gray-600 space-y-1">
+                          <li>• Users who accepted loans vs those who declined</li>
+                          <li>• Average loan sizes and acceptance rates</li>
+                          <li>• Credit and trust score comparisons</li>
+                          <li>• Borrowing patterns by context (ROSCA, savings, etc.)</li>
+                        </ul>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <>
+                    {/* Key Metrics */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-white p-5 rounded-xl shadow-sm border">
+                        <div className="text-3xl font-bold text-green-600 mb-2">
+                          {borrowerIds.size}
+                        </div>
+                        <p className="text-sm font-semibold text-gray-700">Users Who Borrowed</p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {((borrowerIds.size / summary.totalUsers) * 100).toFixed(1)}% of total users
+                        </p>
+                      </div>
+
+                      <div className="bg-white p-5 rounded-xl shadow-sm border">
+                        <div className="text-3xl font-bold text-red-600 mb-2">
+                          {declinedIds.size}
+                        </div>
+                        <p className="text-sm font-semibold text-gray-700">Users Who Declined</p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Rejected loan offers
+                        </p>
+                      </div>
+
+                      <div className="bg-white p-5 rounded-xl shadow-sm border">
+                        <div className="text-3xl font-bold text-blue-600 mb-2">
+                          ₦{Math.round(summary.borrowing.avgLoanAmount).toLocaleString()}
+                        </div>
+                        <p className="text-sm font-semibold text-gray-700">Avg Loan Size</p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Mean across all loans
+                        </p>
+                      </div>
+
+                      <div className="bg-white p-5 rounded-xl shadow-sm border">
+                        <div className="text-3xl font-bold text-orange-600 mb-2">
+                          {loanAnalysis.acceptanceRate}%
+                        </div>
+                        <p className="text-sm font-semibold text-gray-700">Acceptance Rate</p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {loanAnalysis.totalAccepted} of {loanAnalysis.totalPrompts} offers
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Borrower vs Non-Borrower Comparison */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border">
+                      <h3 className="font-bold text-lg mb-4">👥 Borrower vs Non-Borrower Analysis</h3>
+                      <div className="grid md:grid-cols-2 gap-6">
+                        {/* Borrowers */}
+                        <div className="border-l-4 border-green-500 pl-4 bg-green-50 p-4 rounded-r-lg">
+                          <h4 className="font-bold text-green-900 mb-3">✓ Users Who Borrowed ({borrowerIds.size})</h4>
+                          {(() => {
+                            const borrowers = Array.from(borrowerIds).map(userId => ({
+                              userId,
+                              ...summary.userScores[userId],
+                              loanCount: summary.actions.filter(a => a.userId === userId && a.actionType === "loan_taken").length,
+                              totalBorrowed: summary.actions.filter(a => a.userId === userId && a.actionType === "loan_taken").reduce((sum, a) => sum + Number(a.metadata.amount || 0), 0)
+                            }));
+
+                            const avgTrust = borrowers.length > 0 ? (borrowers.reduce((sum, b) => sum + b.trustScore, 0) / borrowers.length).toFixed(1) : 0;
+                            const avgCredit = borrowers.length > 0 ? Math.round(borrowers.reduce((sum, b) => sum + b.creditScore, 0) / borrowers.length) : 0;
+                            const avgLoans = borrowers.length > 0 ? (borrowers.reduce((sum, b) => sum + b.loanCount, 0) / borrowers.length).toFixed(1) : 0;
+
+                            return (
+                              <div className="space-y-2 text-sm">
+                                <p><span className="font-semibold">Avg Trust Score:</span> <span className="text-green-700 text-lg">{avgTrust}</span></p>
+                                <p><span className="font-semibold">Avg Credit Score:</span> <span className="text-blue-700 text-lg">{avgCredit}</span></p>
+                                <p><span className="font-semibold">Avg Loans per User:</span> {avgLoans}</p>
+                                <p className="text-xs text-green-800 mt-3 italic bg-green-100 p-2 rounded">
+                                  💡 These users leveraged credit facilities, showing comfort with debt or liquidity needs.
+                                </p>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Non-Borrowers */}
+                        <div className="border-l-4 border-blue-500 pl-4 bg-blue-50 p-4 rounded-r-lg">
+                          <h4 className="font-bold text-blue-900 mb-3">⚪ Users Who Never Borrowed ({nonBorrowerIds.length})</h4>
+                          {(() => {
+                            const nonBorrowers = nonBorrowerIds.map(userId => ({
+                              userId,
+                              ...summary.userScores[userId],
+                              roscaCount: summary.actions.filter(a => a.userId === userId && a.actionType === "rosca_join").length
+                            }));
+
+                            const avgTrust = nonBorrowers.length > 0 ? (nonBorrowers.reduce((sum, b) => sum + b.trustScore, 0) / nonBorrowers.length).toFixed(1) : 0;
+                            const avgCredit = nonBorrowers.length > 0 ? Math.round(nonBorrowers.reduce((sum, b) => sum + b.creditScore, 0) / nonBorrowers.length) : 0;
+                            const avgRosca = nonBorrowers.length > 0 ? (nonBorrowers.reduce((sum, b) => sum + b.roscaCount, 0) / nonBorrowers.length).toFixed(1) : 0;
+
+                            return (
+                              <div className="space-y-2 text-sm">
+                                <p><span className="font-semibold">Avg Trust Score:</span> <span className="text-green-700 text-lg">{avgTrust}</span></p>
+                                <p><span className="font-semibold">Avg Credit Score:</span> <span className="text-blue-700 text-lg">{avgCredit}</span></p>
+                                <p><span className="font-semibold">Avg ROSCA Joins:</span> {avgRosca}</p>
+                                <p className="text-xs text-blue-800 mt-3 italic bg-blue-100 p-2 rounded">
+                                  �� These users avoided debt, indicating financial stability or debt aversion.
+                                </p>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Score Comparison Chart */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border">
+                      <h3 className="font-bold text-lg mb-4">📊 Credit & Trust Score Comparison</h3>
+                      <div className="grid md:grid-cols-2 gap-6">
+                        {/* Trust Scores */}
+                        <div>
+                          <h4 className="font-semibold mb-3 text-sm text-center">Trust Score Distribution</h4>
+                          <ResponsiveContainer width="100%" height={250}>
+                            <BarChart data={(() => {
+                              const borrowers = Array.from(borrowerIds).map(id => summary.userScores[id]?.trustScore || 0);
+                              const nonBorrowers = nonBorrowerIds.map(id => summary.userScores[id]?.trustScore || 0);
+
+                              return [
+                                {
+                                  group: "Borrowed",
+                                  score: borrowers.length > 0 ? parseFloat((borrowers.reduce((a,b) => a+b, 0) / borrowers.length).toFixed(1)) : 0
+                                },
+                                {
+                                  group: "Never Borrowed",
+                                  score: nonBorrowers.length > 0 ? parseFloat((nonBorrowers.reduce((a,b) => a+b, 0) / nonBorrowers.length).toFixed(1)) : 0
+                                }
+                              ];
+                            })()}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="group" />
+                              <YAxis domain={[0, 100]} />
+                              <Tooltip />
+                              <Bar dataKey="score" fill="#10B981" name="Avg Trust Score" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        {/* Credit Scores */}
+                        <div>
+                          <h4 className="font-semibold mb-3 text-sm text-center">Credit Score Distribution</h4>
+                          <ResponsiveContainer width="100%" height={250}>
+                            <BarChart data={(() => {
+                              const borrowers = Array.from(borrowerIds).map(id => summary.userScores[id]?.creditScore || 0);
+                              const nonBorrowers = nonBorrowerIds.map(id => summary.userScores[id]?.creditScore || 0);
+
+                              return [
+                                {
+                                  group: "Borrowed",
+                                  score: borrowers.length > 0 ? Math.round(borrowers.reduce((a,b) => a+b, 0) / borrowers.length) : 0
+                                },
+                                {
+                                  group: "Never Borrowed",
+                                  score: nonBorrowers.length > 0 ? Math.round(nonBorrowers.reduce((a,b) => a+b, 0) / nonBorrowers.length) : 0
+                                }
+                              ];
+                            })()}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="group" />
+                              <YAxis domain={[300, 900]} />
+                              <Tooltip />
+                              <Bar dataKey="score" fill="#3B82F6" name="Avg Credit Score" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Research Insights */}
+                    <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-6">
+                      <h3 className="font-bold text-amber-900 mb-3">💡 Key Research Insights</h3>
+                      <div className="space-y-2 text-sm text-amber-900">
+                        <p>• <strong>{((borrowerIds.size / summary.totalUsers) * 100).toFixed(1)}%</strong> of users borrowed at least once</p>
+                        <p>• Loan acceptance rate of <strong>{loanAnalysis.acceptanceRate}%</strong> indicates {loanAnalysis.acceptanceRate > 60 ? "high credit adoption" : "moderate borrowing behavior"}</p>
+                        <p>• Average loan size: <strong>₦{Math.round(summary.borrowing.avgLoanAmount).toLocaleString()}</strong></p>
+                        <p>• {declinedIds.size} users actively declined loan offers, showing debt-averse behavior</p>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </>
+        )}
+
+        {/* ROSCA TAB - RESEARCH FOCUSED */}
+        {selectedTab === "rosca" && summary && (
+          <>
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-green-50 to-teal-50 border-2 border-green-200 rounded-xl p-6">
+                <h2 className="font-bold text-lg mb-2 text-green-900">
+                  🔄 ROSCA Research Analysis
+                </h2>
+                <p className="text-sm text-green-800">
+                  Rotating Savings and Credit Association participation patterns, trust building, and community lending insights.
+                </p>
+              </div>
+
+              {(() => {
+                const roscaJoins = summary.actions.filter(a => a.actionType === "rosca_join");
+                const roscaGroups = Object.keys(summary.roscaGroups || {});
+
+                // Check if we have data
+                if (roscaJoins.length === 0) {
+                  return (
+                    <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-8 text-center">
+                      <Users size={48} className="mx-auto mb-4 text-yellow-600" />
+                      <h3 className="font-bold text-lg text-yellow-900 mb-2">No ROSCA Data Yet</h3>
+                      <p className="text-sm text-yellow-800 mb-4">
+                        This section will show data once users join ROSCA groups.
+                      </p>
+                      <div className="text-left max-w-md mx-auto bg-white p-4 rounded-lg">
+                        <p className="text-xs font-semibold text-gray-700 mb-2">Metrics will include:</p>
+                        <ul className="text-xs text-gray-600 space-y-1">
+                          <li>• ROSCA group formation and participation rates</li>
+                          <li>• Payment consistency and trust building patterns</li>
+                          <li>• Credit score impact of ROSCA participation</li>
+                          <li>• Group performance and completion rates</li>
+                        </ul>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const participatedUsers = new Set(roscaJoins.map(a => a.userId));
+
+                return (
+                  <>
+                    {/* Key Metrics */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-gradient-to-br from-teal-50 to-emerald-50 p-6 rounded-xl shadow-sm border-2 border-teal-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="p-3 bg-teal-100 rounded-xl">
+                            <Users size={28} className="text-teal-600" />
+                          </div>
+                          <div className="text-right">
+                            <div className="text-4xl font-bold text-teal-700">
+                              {roscaGroups.length}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-sm font-bold text-teal-900">Active ROSCA Groups</p>
+                        <p className="text-xs text-teal-700 mt-1">Total groups formed by users</p>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-6 rounded-xl shadow-sm border-2 border-blue-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="p-3 bg-blue-100 rounded-xl">
+                            <TrendingUp size={28} className="text-blue-600" />
+                          </div>
+                          <div className="text-right">
+                            <div className="text-4xl font-bold text-blue-700">
+                              {roscaJoins.length}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-sm font-bold text-blue-900">Total Participations</p>
+                        <p className="text-xs text-blue-700 mt-1">Individual group joins</p>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-sm border-2 border-purple-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="p-3 bg-purple-100 rounded-xl">
+                            <BarChart3 size={28} className="text-purple-600" />
+                          </div>
+                          <div className="text-right">
+                            <div className="text-4xl font-bold text-purple-700">
+                              {(roscaJoins.length / summary.totalUsers).toFixed(1)}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-sm font-bold text-purple-900">Average per User</p>
+                        <p className="text-xs text-purple-700 mt-1">Participation intensity</p>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-6 rounded-xl shadow-sm border-2 border-orange-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="p-3 bg-orange-100 rounded-xl">
+                            <DollarSign size={28} className="text-orange-600" />
+                          </div>
+                          <div className="text-right">
+                            <div className="text-4xl font-bold text-orange-700">
+                              {((participatedUsers.size / summary.totalUsers) * 100).toFixed(1)}%
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-sm font-bold text-orange-900">Participation Rate</p>
+                        <p className="text-xs text-orange-700 mt-1">{participatedUsers.size} of {summary.totalUsers} users</p>
+                      </div>
+                    </div>
+
+                    {/* Group Performance */}
+                    {Object.keys(summary.roscaPools || {}).length > 0 && (
+                      <div className="bg-white p-6 rounded-xl shadow-sm border">
+                        <h3 className="font-bold text-lg mb-4">📊 ROSCA Group Details</h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="text-left p-3 font-semibold">Group ID</th>
+                                <th className="text-left p-3 font-semibold">Members</th>
+                                <th className="text-left p-3 font-semibold">Total Pool</th>
+                                <th className="text-left p-3 font-semibold">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {Object.entries(summary.roscaPools).slice(0, 10).map(([groupId, data]) => (
+                                <tr key={groupId} className="border-b hover:bg-gray-50">
+                                  <td className="p-3 font-mono text-xs">{groupId.substring(0, 16)}...</td>
+                                  <td className="p-3"><span className="font-semibold">{data.members}</span>/6</td>
+                                  <td className="p-3 font-semibold text-green-700">₦{data.totalPool.toLocaleString()}</td>
+                                  <td className="p-3">
+                                    <span className={`px-2 py-1 rounded-full text-xs ${data.members === 6 ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                                      {data.members === 6 ? "Complete" : "Forming"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Trust & Credit Impact */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border">
+                      <h3 className="font-bold text-lg mb-4">📈 ROSCA Impact on Creditworthiness</h3>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={(() => {
+                          const participated = Array.from(participatedUsers).map(id => summary.userScores[id]);
+                          const notParticipated = summary.userIds.filter(id => !participatedUsers.has(id)).map(id => summary.userScores[id]);
+
+                          return [
+                            {
+                              group: "ROSCA Participants",
+                              trust: participated.length > 0 ? parseFloat((participated.reduce((sum, s) => sum + (s?.trustScore || 0), 0) / participated.length).toFixed(1)) : 0,
+                              credit: participated.length > 0 ? Math.round(participated.reduce((sum, s) => sum + (s?.creditScore || 0), 0) / participated.length) : 0
+                            },
+                            {
+                              group: "Non-Participants",
+                              trust: notParticipated.length > 0 ? parseFloat((notParticipated.reduce((sum, s) => sum + (s?.trustScore || 0), 0) / notParticipated.length).toFixed(1)) : 0,
+                              credit: notParticipated.length > 0 ? Math.round(notParticipated.reduce((sum, s) => sum + (s?.creditScore || 0), 0) / notParticipated.length) : 0
+                            }
+                          ];
+                        })()}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="group" />
+                          <YAxis yAxisId="left" domain={[0, 100]} />
+                          <YAxis yAxisId="right" orientation="right" domain={[300, 900]} />
+                          <Tooltip />
+                          <Legend />
+                          <Bar yAxisId="left" dataKey="trust" fill="#10B981" name="Trust Score" />
+                          <Bar yAxisId="right" dataKey="credit" fill="#3B82F6" name="Credit Score" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                      <p className="text-xs text-gray-600 mt-3 italic text-center">
+                        ROSCA participants typically demonstrate higher trust and credit scores
+                      </p>
+                    </div>
+
+                    {/* Groups Status Tracking */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border">
+                      <h3 className="font-bold text-lg mb-4">🔄 ROSCA Groups Status Tracker</h3>
+                      <p className="text-sm text-gray-600 mb-4">Complete vs Running groups with payout tracking</p>
+
+                      {(() => {
+                        // Get all ROSCA group data from roscaPools
+                        const groupsData = summary.roscaPools || {};
+                        const groupEntries = Object.entries(groupsData);
+
+                        if (groupEntries.length === 0) {
+                          return (
+                            <div className="text-center py-6 text-gray-500">
+                              <p className="text-sm">No detailed group data available yet.</p>
+                              <p className="text-xs mt-2">Groups will appear here once they have member activity.</p>
+                            </div>
+                          );
+                        }
+
+                        // Categorize groups by completion status
+                        // A group is complete if all 6 members have received their payout
+                        // For now, we'll use member count and pool status as proxy
+                        const completeGroups = groupEntries.filter(([_, data]) =>
+                          data.members === 6 && data.totalPool > 0
+                        );
+                        const runningGroups = groupEntries.filter(([_, data]) =>
+                          data.members < 6 || data.totalPool === 0
+                        );
+
+                        return (
+                          <>
+                            {/* Status Summary */}
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                              <div className="bg-green-50 p-4 rounded-lg text-center">
+                                <div className="text-3xl font-bold text-green-600 mb-1">
+                                  {completeGroups.length}
+                                </div>
+                                <p className="text-sm font-semibold text-green-800">Complete Groups</p>
+                                <p className="text-xs text-green-600 mt-1">All members joined</p>
+                              </div>
+                              <div className="bg-blue-50 p-4 rounded-lg text-center">
+                                <div className="text-3xl font-bold text-blue-600 mb-1">
+                                  {runningGroups.length}
+                                </div>
+                                <p className="text-sm font-semibold text-blue-800">Running Groups</p>
+                                <p className="text-xs text-blue-600 mt-1">Still forming</p>
+                              </div>
+                              <div className="bg-purple-50 p-4 rounded-lg text-center">
+                                <div className="text-3xl font-bold text-purple-600 mb-1">
+                                  {groupEntries.length}
+                                </div>
+                                <p className="text-sm font-semibold text-purple-800">Total Groups</p>
+                                <p className="text-xs text-purple-600 mt-1">All groups</p>
+                              </div>
+                            </div>
+
+                            {/* Complete Groups Table */}
+                            {completeGroups.length > 0 && (
+                              <div className="mb-6">
+                                <h4 className="font-semibold text-sm text-green-800 mb-3 flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                                  Complete Groups ({completeGroups.length})
+                                </h4>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm border rounded-lg">
+                                    <thead className="bg-green-50">
+                                      <tr>
+                                        <th className="text-left p-3 font-semibold text-green-900">Group ID</th>
+                                        <th className="text-center p-3 font-semibold text-green-900">Members</th>
+                                        <th className="text-right p-3 font-semibold text-green-900">Total Pool</th>
+                                        <th className="text-center p-3 font-semibold text-green-900">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {completeGroups.map(([groupId, data]) => (
+                                        <tr key={groupId} className="border-t hover:bg-green-50/50">
+                                          <td className="p-3 font-mono text-xs">{groupId.substring(0, 20)}...</td>
+                                          <td className="p-3 text-center">
+                                            <span className="font-semibold text-green-700">{data.members}/6</span>
+                                          </td>
+                                          <td className="p-3 text-right font-semibold text-green-700">
+                                            ₦{data.totalPool.toLocaleString()}
+                                          </td>
+                                          <td className="p-3 text-center">
+                                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                                              ✓ Complete
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Running Groups Table */}
+                            {runningGroups.length > 0 && (
+                              <div>
+                                <h4 className="font-semibold text-sm text-blue-800 mb-3 flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+                                  Running Groups ({runningGroups.length})
+                                </h4>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm border rounded-lg">
+                                    <thead className="bg-blue-50">
+                                      <tr>
+                                        <th className="text-left p-3 font-semibold text-blue-900">Group ID</th>
+                                        <th className="text-center p-3 font-semibold text-blue-900">Members</th>
+                                        <th className="text-right p-3 font-semibold text-blue-900">Total Pool</th>
+                                        <th className="text-center p-3 font-semibold text-blue-900">Progress</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {runningGroups.map(([groupId, data]) => {
+                                        const progress = (data.members / 6) * 100;
+                                        return (
+                                          <tr key={groupId} className="border-t hover:bg-blue-50/50">
+                                            <td className="p-3 font-mono text-xs">{groupId.substring(0, 20)}...</td>
+                                            <td className="p-3 text-center">
+                                              <span className="font-semibold text-blue-700">{data.members}/6</span>
+                                            </td>
+                                            <td className="p-3 text-right font-semibold text-gray-700">
+                                              {data.totalPool > 0 ? `₦${data.totalPool.toLocaleString()}` : '—'}
+                                            </td>
+                                            <td className="p-3">
+                                              <div className="flex items-center gap-2">
+                                                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                                  <div
+                                                    className="bg-blue-500 h-2 rounded-full transition-all"
+                                                    style={{ width: `${progress}%` }}
+                                                  />
+                                                </div>
+                                                <span className="text-xs font-semibold text-blue-600">
+                                                  {progress.toFixed(0)}%
+                                                </span>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Research Insights */}
+                    <div className="bg-teal-50 border-2 border-teal-200 rounded-xl p-6">
+                      <h3 className="font-bold text-teal-900 mb-3">🔬 ROSCA Research Findings</h3>
+                      <div className="space-y-2 text-sm text-teal-900">
+                        <p>• <strong>{participatedUsers.size}</strong> users ({((participatedUsers.size / summary.totalUsers) * 100).toFixed(1)}%) participated in ROSCA groups</p>
+                        <p>• Average <strong>{(roscaJoins.length / summary.totalUsers).toFixed(1)}</strong> group joins per user</p>
+                        <p>• <strong>{roscaGroups.length}</strong> total groups formed with varying completion rates</p>
+                        <p>• ROSCA participation correlates with {summary.regular.rate}% regular contribution rate</p>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </>
         )}

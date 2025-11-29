@@ -33,6 +33,8 @@ import { auth, db } from "../lib/firebase";
 import Welcome from "../app/Welcome";
 import KYC from "../app/KYC";
 import DashboardScreen from "../app/DashboardScreen";
+import DashboardScreenNew from "../app/DashboardScreenNew";
+import TrustScorePage from "../app/TrustScorePage";
 import AdminAnalytics from "../app/AdminAnalytics";
 import {
   createUserWithEmailAndPassword,
@@ -2494,6 +2496,8 @@ useEffect(() => {
   // ===== ROSCA SCREEN - 100% REAL DATA =====
   // ===== ROSCA SCREEN - 100% REAL DATA =====
   const Rosca = () => {
+    const [currencyFilter, setCurrencyFilter] = React.useState("ALL");
+
     if (!uD) {
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
@@ -2838,7 +2842,11 @@ useEffect(() => {
 
     // Get available groups to join
     const availableGroups = aG.filter(
-      (g) => g.c < g.m && !joinedGroups.some((jg) => jg.id === g.id)
+      (g) => {
+        const notJoined = g.c < g.m && !joinedGroups.some((jg) => jg.id === g.id);
+        if (currencyFilter === "ALL") return notJoined;
+        return notJoined && (g.currency || "NGN") === currencyFilter;
+      }
     );
     // .slice(0, 5);
 
@@ -3571,8 +3579,67 @@ useEffect(() => {
           )}
 
           {/* Available Groups to Join */}
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+                Available Groups
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrencyFilter("ALL")}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    currencyFilter === "ALL"
+                      ? "bg-teal-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setCurrencyFilter("NGN")}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    currencyFilter === "NGN"
+                      ? "bg-teal-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  ₦ Naira
+                </button>
+                <button
+                  onClick={() => setCurrencyFilter("USD")}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    currencyFilter === "USD"
+                      ? "bg-teal-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  $ Dollar
+                </button>
+                <button
+                  onClick={() => setCurrencyFilter("GBP")}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    currencyFilter === "GBP"
+                      ? "bg-teal-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  £ Pound
+                </button>
+              </div>
+            </div>
 
-          {availableGroups.map((g) => {
+          {availableGroups.length === 0 ? (
+            <div className="bg-white rounded-3xl p-8 border border-gray-200 text-center">
+              <Users size={48} className="mx-auto mb-4 text-gray-400" />
+              <h4 className="font-bold text-gray-900 mb-2">No Groups Available</h4>
+              <p className="text-sm text-gray-600">
+                {currencyFilter !== "ALL"
+                  ? `No ${currencyFilter} groups available at the moment. Try a different currency filter.`
+                  : "All available groups are full or you've already joined them."}
+              </p>
+            </div>
+          ) : (
+            availableGroups.map((g) => {
             const currency = g.currency || "NGN";
             const symbols = { NGN: "₦", USD: "$", EUR: "€", GBP: "£" };
             const symbol = symbols[currency];
@@ -3634,7 +3701,9 @@ useEffect(() => {
                 </div>
               </div>
             );
-          })}
+          })
+          )}
+          </section>
         </main>
 
         <BN active="groups" setScreen={sS} />
@@ -4568,13 +4637,15 @@ useEffect(() => {
             <AdminAnalytics onBack={() => sS("dashboard")} userData={uD} />
           );
         return (
-          <DashboardScreen
+          <DashboardScreenNew
             userData={uD}
-            userRole={uR}
             setCurrentScreen={sS}
-            onClaimToken={claimToken}
+            saveUserData={svD}
+            handleLogout={hLO}
           />
         );
+      case "trust":
+        return <TrustScorePage userData={uD} setCurrentScreen={sS} />;
       case "rosca":
         return <Rosca />;
       case "rosca-detail":
@@ -4591,13 +4662,11 @@ useEffect(() => {
         return <AdminAnalytics onBack={() => sS("dashboard")} userData={uD} />;
       default:
         return (
-          <DashboardScreen
+          <DashboardScreenNew
             userData={uD}
-            userRole={uR}
             setCurrentScreen={sS}
-            onClaimToken={claimToken}
-            exchangeCurrency={exchangeCurrency} // ADD THIS
-            saveUserData={svD} // ADD THIS
+            saveUserData={svD}
+            handleLogout={hLO}
           />
         );
     }

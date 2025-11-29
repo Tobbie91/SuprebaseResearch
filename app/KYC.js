@@ -21,6 +21,12 @@ export default function KYC({ onComplete, saveData }) {
     }
   };
 
+  const handleSkip = () => {
+    // Skip KYC and continue to dashboard
+    if (saveData) saveData({ hK: false, kycComplete: false });
+    if (onComplete) onComplete();
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* --- Progress bar --- */}
@@ -42,6 +48,12 @@ export default function KYC({ onComplete, saveData }) {
       {step === 1 && (
         <>
           <h2 className="text-2xl font-bold mb-2">Verify Identity</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Complete KYC to unlock higher limits and features
+            <span className="block text-teal-600 font-semibold mt-1">
+              (Optional - you can skip for now)
+            </span>
+          </p>
           <input
             type="text"
             placeholder="BVN"
@@ -93,11 +105,23 @@ export default function KYC({ onComplete, saveData }) {
       {/* --- Next button --- */}
       <button
         onClick={handleNext}
-        className="w-full py-4 rounded-full font-semibold text-white"
+        className="w-full py-4 rounded-full font-semibold text-white mb-3"
         style={{ backgroundColor: "#2D9B7B" }}
       >
         {step === 3 ? "Complete" : "Continue"}
       </button>
+
+      {/* --- Skip button --- */}
+      <button
+        onClick={handleSkip}
+        className="w-full py-4 rounded-full font-semibold text-gray-600 bg-white border-2 border-gray-300 hover:bg-gray-50 transition-colors"
+      >
+        Skip for now
+      </button>
+
+      <p className="text-xs text-center text-gray-500 mt-3">
+        You can complete KYC later from your profile
+      </p>
     </div>
   );
 }

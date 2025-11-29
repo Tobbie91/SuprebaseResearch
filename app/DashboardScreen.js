@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 import useUserRole from "../lib/useUserRole";
 import { useRouter } from "next/navigation";
-import { getAuth, signOut } from "firebase/auth";
+import { auth } from "../lib/firebase";
+import { signOut } from "firebase/auth";
 
 
 // ✅ Use your same color palette (C) from the app
@@ -156,7 +157,6 @@ export default function DashboardScreen({
 
   // Check if any loans are tied to ROSCA
   const roscaLoans = userData.ln?.filter(ln => ln.groupId) || [];
-  const auth = getAuth();
 
   const handleLogout = async () => {
     try {
