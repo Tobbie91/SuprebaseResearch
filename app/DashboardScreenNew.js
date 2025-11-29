@@ -74,8 +74,8 @@ export default function DashboardScreenNew({
   const balance = userData?.wallets?.[userData?.selectedCurrency || "NGN"] || 0;
   const currencySymbol = userData?.selectedCurrency === "NGN" ? "₦" : "$";
   const roscaGroups = userData?.jG || []; // Use joined groups (jG)
-  const trustScore = userData?.trustScore || 72;
-  const creditScore = userData?.creditScore || 650;
+  const trustScore = userData?.trustScore || 100;
+  const creditScore = userData?.creditScore || 850;
 
   // Calculate next payment due (earliest nextDeduction date from active groups)
   const activeDueGroups = roscaGroups.filter(

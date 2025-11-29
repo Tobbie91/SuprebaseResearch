@@ -1647,6 +1647,10 @@ useEffect(() => {
         inv: [],
         kycComplete: false,
         createdAt: new Date().toISOString(),
+
+        // Perfect scores for new users until behavior changes them
+        trustScore: 100,
+        creditScore: 850,
       };
 
       await setDoc(doc(db, "users", u.uid), nD);

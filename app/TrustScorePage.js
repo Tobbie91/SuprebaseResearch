@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 export default function TrustScorePage({ userData, setCurrentScreen }) {
-  const trustScore = userData?.trustScore || 72;
+  const trustScore = userData?.trustScore || 100;
   const scorePercentage = (trustScore / 100) * 100;
   const circumference = 2 * Math.PI * 88;
   const strokeDashoffset = circumference - (scorePercentage / 100) * circumference;
