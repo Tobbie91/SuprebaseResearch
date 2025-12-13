@@ -31,11 +31,12 @@ import {
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 import Welcome from "../app/Welcome";
-import KYC from "../app/KYC";
+import BaselineSurvey from "../app/BaselineSurvey";
 import DashboardScreen from "../app/DashboardScreen";
 import DashboardScreenNew from "../app/DashboardScreenNew";
 import TrustScorePage from "../app/TrustScorePage";
 import AdminAnalytics from "../app/AdminAnalytics";
+import ResearchDataScreen from "../app/ResearchDataScreen";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -58,6 +59,7 @@ import {
   trackInvestment,
   trackTokenClaim,
 } from "../lib/analytics";
+import { getCurrencyConfig, CURRENCY_SYMBOLS, TOKEN_AMOUNTS } from "../lib/currencyUtils";
 
 const safeArray = (arr) => (Array.isArray(arr) ? arr : []);
 
@@ -93,6 +95,75 @@ const C = {
 // ===== REAL ROSCA GROUPS (30+ groups for 200 users) =====
 // ===== REAL ROSCA GROUPS (30+ groups for 200 users) =====
 const INITIAL_ROSCA_GROUPS = [
+  // PRE-FILLED ACTIVE GROUPS (Already started with members)
+  {
+    id: "active1",
+    n: "Winners Circle",
+    a: 10000,
+    f: "Weekly",
+    d: "6w",
+    m: 6,
+    c: 6, // FULL
+    ad: "Admin",
+    r: 98,
+    started: true,
+    startDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(), // Started 2 weeks ago
+    members: ["demo1", "demo2", "demo3", "demo4", "demo5", "demo6"],
+    memberNames: ["Tunde A.", "Chioma B.", "Yemi C.", "Bola D.", "Kemi E.", "Segun F."],
+    weeksPaid: 2,
+    currentPayoutPosition: 3,
+    nextDeduction: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "active2",
+    n: "Dream Team",
+    a: 20000,
+    f: "Monthly",
+    d: "6m",
+    m: 6,
+    c: 6, // FULL
+    ad: "Admin",
+    r: 95,
+    started: true,
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // Started 1 month ago
+    members: ["demo7", "demo8", "demo9", "demo10", "demo11", "demo12"],
+    memberNames: ["Ada M.", "Femi N.", "Grace O.", "John P.", "Peace Q.", "Victor R."],
+    weeksPaid: 1,
+    currentPayoutPosition: 2,
+    nextDeduction: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  // ALMOST FULL GROUPS (Filling up fast!)
+  {
+    id: "filling1",
+    n: "Rising Stars",
+    a: 5000,
+    f: "Weekly",
+    d: "6w",
+    m: 6,
+    c: 4, // 4 out of 6
+    ad: "Admin",
+    r: 94,
+    started: false,
+    startDate: null,
+    members: ["demo13", "demo14", "demo15", "demo16"],
+    memberNames: ["Ayo S.", "Blessing T.", "Chidi U.", "Dayo V."],
+  },
+  {
+    id: "filling2",
+    n: "Goal Getters",
+    a: 15000,
+    f: "Monthly",
+    d: "6m",
+    m: 6,
+    c: 5, // 5 out of 6 - ONE SPOT LEFT!
+    ad: "Admin",
+    r: 97,
+    started: false,
+    startDate: null,
+    members: ["demo17", "demo18", "demo19", "demo20", "demo21"],
+    memberNames: ["Emeka W.", "Faith X.", "Gift Y.", "Henry Z.", "Ibukun A."],
+  },
+
   // Weekly 3K Groups (Budget friendly - 12 groups)
   {
     id: "wk3k1",
@@ -1282,11 +1353,11 @@ export default function App() {
   // ===== Firebase Auth =====
   // Load groups from Firebase on app start - MULTIPLE TRIGGERS
   useEffect(() => {
-    if (uD?.id && auth.currentUser) {
+    if (uD?.id && auth?.currentUser) {
       console.log("🎯 Triggering group load for user:", uD.name);
       loadGroupsFromFirebase();
     }
-  }, [uD?.id, auth.currentUser?.uid]); // Watch both user data AND auth state
+  }, [uD?.id, auth?.currentUser?.uid]); // Watch both user data AND auth state
 
   // ALSO load when user completes signup/login
   useEffect(() => {
@@ -1311,7 +1382,7 @@ export default function App() {
 
 // 🔥 REAL-TIME GROUP SYNC - All users see updates instantly
 useEffect(() => {
-  if (!auth.currentUser) return;
+  if (!auth?.currentUser) return;
 
   console.log("🎯 Starting real-time group listener");
 
@@ -1356,12 +1427,12 @@ useEffect(() => {
     console.log("🛑 Stopping real-time group listeners");
     unsubscribers.forEach((unsub) => unsub());
   };
-}, [auth.currentUser?.uid]); // Re-run when user changes
+}, [auth?.currentUser?.uid]); // Re-run when user changes
 
 
 // 🔥 REAL-TIME USER DATA SYNC
 useEffect(() => {
-  if (!uD?.id || !auth.currentUser) return;
+  if (!uD?.id || !auth?.currentUser) return;
 
   console.log("🎯 Starting real-time user data listener");
 
@@ -1385,16 +1456,21 @@ useEffect(() => {
     console.log("🛑 Stopping user data listener");
     unsubscribe();
   };
-}, [uD?.id, auth.currentUser?.uid]);
+}, [uD?.id, auth?.currentUser?.uid]);
 
   useEffect(() => {
+    if (!auth) return;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         const ref = doc(db, "users", user.uid);
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          sUD(snap.data());
-          sUR(snap.data().role);
+          const userData = snap.data();
+
+          sUD(userData);
+          sUR(userData.role);
+
           sS("dashboard");
         }
       } else {
@@ -1442,20 +1518,24 @@ useEffect(() => {
         const groupSnap = await getDoc(groupRef);
 
         if (!groupSnap.exists()) {
-          // Randomly assign 0-5 members (never 6, that would be full)
-          const randomMembers = Math.floor(Math.random() * 6); // 0 to 5
+          // If group has pre-filled member data, use it; otherwise random
+          const hasPrefilledMembers = group.members && group.members.length > 0;
+          const memberCount = hasPrefilledMembers
+            ? group.c || group.members.length
+            : Math.floor(Math.random() * 6); // 0 to 5
 
           await setDoc(groupRef, {
             ...group,
-            c: randomMembers, // Current member count
+            c: memberCount, // Current member count
             createdAt: new Date().toISOString(),
             lastUpdated: new Date().toISOString(),
-            members: [], // Will store member UIDs when users join
+            members: group.members || [], // Use pre-filled members or empty
+            memberNames: group.memberNames || [], // Use pre-filled names or empty
           });
 
           created++;
           console.log(
-            `✅ Created: ${group.n} (${randomMembers}/${group.m} members)`
+            `✅ Created: ${group.n} (${memberCount}/${group.m} members)${hasPrefilledMembers ? ' [Pre-filled]' : ''}`
           );
         } else {
           skipped++;
@@ -1484,10 +1564,10 @@ useEffect(() => {
   // Load groups from Firebase
   const loadGroupsFromFirebase = async () => {
     console.log("📥 Loading groups from Firebase...");
-    console.log("Auth state:", auth.currentUser?.uid);
+    console.log("Auth state:", auth?.currentUser?.uid);
     console.log("User data:", uD?.id, uD?.name);
 
-    if (!auth.currentUser) {
+    if (!auth?.currentUser) {
       console.warn("⚠️ No authenticated user, skipping group load");
       return;
     }
@@ -1612,7 +1692,7 @@ useEffect(() => {
     );
   };
 
-  const hSU = async (e, p, n, ph, r) => {
+  const hSU = async (e, p, n, ph, r, currency) => {
     try {
       const uC = await createUserWithEmailAndPassword(auth, e, p);
       const u = uC.user;
@@ -1634,12 +1714,12 @@ useEffect(() => {
         },
 
         wb: 0,
-        selectedCurrency: "NGN",
+        selectedCurrency: currency || "NGN",
 
         at: 0,
         cs: 0,
         hC: false,
-        jG: [],
+        jG: [], // Empty - users join groups themselves
         gR: [],
         ln: [],
         fS: [],
@@ -1651,21 +1731,24 @@ useEffect(() => {
         // Perfect scores for new users until behavior changes them
         trustScore: 100,
         creditScore: 850,
+
+        // Baseline survey data (to be filled later)
+        baselineSurvey: null,
+        surveyCompletedAt: null,
+        baselineSurveySkipped: false,
       };
 
       await setDoc(doc(db, "users", u.uid), nD);
       await trackUserRegistration(nD);
+
       sUD(nD);
       sUR(r);
 
-      console.log("✅ User registered and tracked");
-
-      // 🔥 FORCE LOAD GROUPS FOR NEW USER
-      console.log("🔄 Loading groups for new user...");
-      setTimeout(async () => {
-        await loadGroupsFromFirebase();
-        console.log("✅ Groups loaded for new user");
-      }, 1000); // Wait 1 second for auth to settle
+      console.log("✅ User registered successfully:", {
+        userId: u.uid,
+        name: nD.name,
+        currency: nD.selectedCurrency
+      });
 
       sS("kyc");
       return { success: true };
@@ -1737,26 +1820,15 @@ useEffect(() => {
       return;
     }
 
-    // 💱 NEW: Let user choose currency
-    const currency = await new Promise((resolve) => {
-      const choice = prompt(
-        "Choose your research token currency:\n\n" +
-          "1. NGN - ₦100,000 (Nigerian Naira)\n" +
-          "2. USD - $500 (US Dollar)\n" +
-          "3. EUR - €450 (Euro)\n" +
-          "4. GBP - £400 (British Pound)\n\n" +
-          "Enter number (1-4):"
-      );
+    // 💱 Use user's selected currency automatically
+    const userCurrency = uD?.selectedCurrency || "NGN";
+    const currencyConfig = getCurrencyConfig(userCurrency);
 
-      const currencies = {
-        1: { code: "NGN", amount: 100000, symbol: "₦" },
-        2: { code: "USD", amount: 500, symbol: "$" },
-        3: { code: "EUR", amount: 450, symbol: "€" },
-        4: { code: "GBP", amount: 400, symbol: "£" },
-      };
-
-      resolve(currencies[choice] || currencies["1"]);
-    });
+    const currency = {
+      code: currencyConfig.code,
+      amount: currencyConfig.tokenAmount,
+      symbol: currencyConfig.symbol
+    };
 
     try {
       const userRef = doc(db, "users", uD.id);
@@ -1981,6 +2053,9 @@ useEffect(() => {
       const groupStarted = isLastMember;
 
       // 🔥 UPDATE GROUP IN FIREBASE
+      // Get user's display name for member tracking
+      const userName = uD.name || uD.email?.split('@')[0] || `User ${uD.id.substring(0, 6)}`;
+
       if (groupSnap.exists()) {
         await updateDoc(groupRef, {
           c: position,
@@ -1988,6 +2063,7 @@ useEffect(() => {
           startDate: groupStartDate,
           lastUpdated: new Date().toISOString(),
           members: [...(currentGroup.members || []), uD.id],
+          memberNames: [...(currentGroup.memberNames || []), userName],
         });
       } else {
         await setDoc(groupRef, {
@@ -1998,6 +2074,7 @@ useEffect(() => {
           createdAt: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
           members: [uD.id],
+          memberNames: [userName],
         });
       }
 
@@ -2872,7 +2949,7 @@ useEffect(() => {
               <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 font-medium">Good Morning,</p>
+              <p className="text-xs text-gray-500 font-medium">Hey there,</p>
               <h1 className="text-lg font-bold">{uD?.name || "User"}</h1>
             </div>
           </div>
@@ -4634,7 +4711,7 @@ useEffect(() => {
       case "welcome":
         return <Welcome onSignup={hSU} onLogin={hLI} />;
       case "kyc":
-        return <KYC onComplete={() => sS("dashboard")} saveData={svD} />;
+        return <BaselineSurvey onComplete={() => sS("dashboard")} saveData={svD} />;
       case "dashboard":
         if (uR === "superadmin")
           return (
@@ -4646,10 +4723,13 @@ useEffect(() => {
             setCurrentScreen={sS}
             saveUserData={svD}
             handleLogout={hLO}
+            seedGroups={seedGroupsToFirebase}
           />
         );
       case "trust":
         return <TrustScorePage userData={uD} setCurrentScreen={sS} />;
+      case "research":
+        return <ResearchDataScreen userData={uD} setCurrentScreen={sS} />;
       case "rosca":
         return <Rosca />;
       case "rosca-detail":

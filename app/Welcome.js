@@ -141,6 +141,7 @@ export default function Welcome({ onSignup, onLogin }) {
     email: "",
     phone: "",
     password: "",
+    preferredCurrency: "NGN",
     role: "user",
   });
   const [isLogin, setIsLogin] = useState(false);
@@ -299,7 +300,8 @@ export default function Welcome({ onSignup, onLogin }) {
             sanitizedForm.password,
             sanitizedForm.name,
             sanitizedForm.phone,
-            "user"
+            "user",
+            sanitizedForm.preferredCurrency
           ),
           timeoutPromise
         ]);
@@ -394,6 +396,26 @@ export default function Welcome({ onSignup, onLogin }) {
             </div>
           )}
 
+          {!isLogin && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Preferred Currency *
+              </label>
+              <select
+                name="preferredCurrency"
+                className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-teal-600 focus:outline-none transition-colors"
+                value={form.preferredCurrency}
+                onChange={handleChange}
+                required={!isLogin}
+              >
+                <option value="NGN">🇳🇬 Nigerian Naira (₦)</option>
+                <option value="USD">🇺🇸 US Dollar ($)</option>
+                <option value="EUR">🇪🇺 Euro (€)</option>
+                <option value="GBP">🇬🇧 British Pound (£)</option>
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Password *
@@ -462,6 +484,7 @@ export default function Welcome({ onSignup, onLogin }) {
                 email: "",
                 phone: "",
                 password: "",
+                preferredCurrency: "NGN",
                 role: "user",
               });
             }}

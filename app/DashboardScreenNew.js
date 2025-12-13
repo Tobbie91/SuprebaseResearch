@@ -67,12 +67,22 @@ export default function DashboardScreenNew({
   setCurrentScreen,
   saveUserData,
   handleLogout,
+  seedGroups,
 }) {
   const [activeTab, setActiveTab] = useState("home");
 
   // Safe data access
   const balance = userData?.wallets?.[userData?.selectedCurrency || "NGN"] || 0;
-  const currencySymbol = userData?.selectedCurrency === "NGN" ? "₦" : "$";
+
+  // Get correct currency symbol based on selected currency
+  const currencySymbols = {
+    NGN: "₦",
+    USD: "$",
+    EUR: "€",
+    GBP: "£"
+  };
+  const currencySymbol = currencySymbols[userData?.selectedCurrency || "NGN"];
+
   const roscaGroups = userData?.jG || []; // Use joined groups (jG)
   const trustScore = userData?.trustScore || 100;
   const creditScore = userData?.creditScore || 850;
@@ -81,6 +91,12 @@ export default function DashboardScreenNew({
   const activeDueGroups = roscaGroups.filter(
     (g) => g.started && g.nextDeduction && g.weeksPaid < g.m
   );
+
+  console.log("📊 Dashboard Debug:");
+  console.log("- Total joined groups:", roscaGroups.length);
+  console.log("- Active groups with due dates:", activeDueGroups.length);
+  console.log("- Joined groups:", roscaGroups);
+
   const nextDueGroup = activeDueGroups.sort(
     (a, b) => new Date(a.nextDeduction) - new Date(b.nextDeduction)
   )[0];
@@ -91,6 +107,10 @@ export default function DashboardScreenNew({
         day: "numeric",
       })
     : null;
+
+  console.log("- Next due group:", nextDueGroup);
+  console.log("- Upcoming payment:", upcomingPayment);
+  console.log("- Upcoming payment date:", upcomingPaymentDate);
 
   // Calculate next payout (group where it's user's turn or upcoming)
   const nextPayoutGroup = roscaGroups
@@ -108,6 +128,12 @@ export default function DashboardScreenNew({
         })
       : null;
 
+  // Calculate actual payment statistics
+  const totalPaymentsDue = roscaGroups.reduce((sum, g) => sum + (g.weeksPaid || 0), 0);
+  const onTimePayments = totalPaymentsDue; // Assuming all payments are on-time for now
+  const latePayments = 0;
+  const missedPayments = 0;
+
   // Header Component
   const Header = () => (
     <header className="px-4 pt-8 pb-4 sticky top-0 z-10 border-b border-gray-200/40 backdrop-blur-md bg-white/95 shrink-0">
@@ -120,7 +146,7 @@ export default function DashboardScreenNew({
             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] text-gray-500 font-medium">Good Morning,</p>
+            <p className="text-[10px] text-gray-500 font-medium">Hey there,</p>
             <h1 className="text-base font-bold text-gray-900 truncate">{userData?.name || "User"}</h1>
           </div>
         </div>
@@ -158,39 +184,64 @@ export default function DashboardScreenNew({
   );
 
   // Quick Stats Component
-  const QuickStats = () => (
-    <div className="grid grid-cols-2 gap-4">
-      <div className="p-4 rounded-2xl bg-white border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="p-2 rounded-full bg-amber-100 text-amber-600">
-            <Clock size={20} />
+  const QuickStats = () => {
+    // If user has no groups, show empty state
+    if (roscaGroups.length === 0) {
+      return (
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-teal-50 to-emerald-50 border-2 border-dashed border-teal-200">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mb-3">
+              <Users size={28} className="text-teal-600" />
+            </div>
+            <h3 className="text-base font-bold text-gray-900 mb-1">No Groups Yet</h3>
+            <p className="text-sm text-gray-600 mb-4">Join or create a ROSCA group to start saving together</p>
+            <button
+              onClick={() => setCurrentScreen("rosca")}
+              className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Browse Groups
+            </button>
           </div>
-          <span className="text-xs font-medium text-gray-600">Due Soon</span>
         </div>
-        <p className="text-lg font-bold text-gray-900">
-          {upcomingPayment > 0 ? `${currencySymbol}${upcomingPayment.toLocaleString()}` : "—"}
-        </p>
-        <p className="text-xs text-gray-500 mt-1">
-          {upcomingPaymentDate || "No upcoming payments"}
-        </p>
-      </div>
+      );
+    }
 
-      <div className="p-4 rounded-2xl bg-white border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="p-2 rounded-full bg-emerald-100 text-emerald-600">
-            <HandCoins size={20} />
+    // If user has groups, show the stats
+    return (
+      <div className="grid grid-cols-2 gap-4">
+        <div className="p-4 rounded-2xl bg-white border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-2 rounded-full bg-amber-100 text-amber-600">
+              <Clock size={20} />
+            </div>
+            <span className="text-xs font-medium text-gray-600">Due Soon</span>
           </div>
-          <span className="text-xs font-medium text-gray-600">Next Payout</span>
+          <p className="text-lg font-bold text-gray-900">
+            {upcomingPayment > 0 ? `${currencySymbol}${upcomingPayment.toLocaleString()}` : "—"}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {upcomingPaymentDate || "No upcoming payments"}
+          </p>
         </div>
-        <p className="text-lg font-bold text-gray-900">
-          {nextPayout > 0 ? `${currencySymbol}${nextPayout.toLocaleString()}` : "—"}
-        </p>
-        <p className="text-xs text-gray-500 mt-1">
-          {nextPayoutDate || "Not scheduled"}
-        </p>
+
+        <div className="p-4 rounded-2xl bg-white border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-2 rounded-full bg-emerald-100 text-emerald-600">
+              <HandCoins size={20} />
+            </div>
+            <span className="text-xs font-medium text-gray-600">Next Payout</span>
+          </div>
+          <p className="text-lg font-bold text-gray-900">
+            {nextPayout > 0 ? `${currencySymbol}${nextPayout.toLocaleString()}` : "—"}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {nextPayoutDate || "Not scheduled"}
+          </p>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Quick Actions Component
   const QuickActions = () => (
@@ -271,8 +322,346 @@ export default function DashboardScreenNew({
     );
   };
 
-  const ROSCAGroupCard = ({ group }) => (
-    <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm">
+  // Contribution Schedule Component
+  const ContributionSchedule = () => {
+    const [showCalendar, setShowCalendar] = useState(false);
+    const upcomingContributions = roscaGroups
+      .filter(g => g.started && g.nextDeduction)
+      .sort((a, b) => new Date(a.nextDeduction) - new Date(b.nextDeduction))
+      .slice(0, 3);
+
+    if (upcomingContributions.length === 0) return null;
+
+    return (
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">Payment Schedule</h3>
+          <button
+            onClick={() => setShowCalendar(!showCalendar)}
+            className="text-sm font-semibold text-teal-600 flex items-center gap-1"
+          >
+            <Calendar size={16} />
+            {showCalendar ? "Hide Calendar" : "View Calendar"}
+          </button>
+        </div>
+
+        {showCalendar && (
+          <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm mb-4">
+            <div className="text-center mb-4">
+              <h4 className="font-bold text-gray-900 mb-1">
+                {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+              </h4>
+              <p className="text-xs text-gray-600">Upcoming contributions</p>
+            </div>
+            <div className="space-y-3">
+              {upcomingContributions.map((group, idx) => {
+                const daysUntil = Math.ceil((new Date(group.nextDeduction) - new Date()) / (1000 * 60 * 60 * 24));
+                return (
+                  <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+                    <div className="w-12 h-12 rounded-lg bg-teal-100 flex flex-col items-center justify-center">
+                      <span className="text-xs font-bold text-teal-600">
+                        {new Date(group.nextDeduction).toLocaleDateString("en-US", { month: "short" })}
+                      </span>
+                      <span className="text-lg font-bold text-teal-900">
+                        {new Date(group.nextDeduction).getDate()}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-sm text-gray-900">{group.n}</p>
+                      <p className="text-xs text-gray-600">
+                        {daysUntil === 0 ? "Today" : daysUntil === 1 ? "Tomorrow" : `In ${daysUntil} days`}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-gray-900">{currencySymbol}{group.a?.toLocaleString()}</p>
+                      <p className="text-xs text-gray-600">{group.f}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {upcomingContributions.slice(0, showCalendar ? 999 : 2).map((group, idx) => {
+            const daysUntil = Math.ceil((new Date(group.nextDeduction) - new Date()) / (1000 * 60 * 60 * 24));
+            const isUrgent = daysUntil <= 2;
+
+            return (
+              <div
+                key={idx}
+                className={`bg-white rounded-3xl p-5 border-2 shadow-sm ${
+                  isUrgent ? "border-amber-300 bg-amber-50" : "border-gray-200"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="font-bold text-gray-900">{group.n}</h4>
+                      {isUrgent && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold uppercase">
+                          Due Soon
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {new Date(group.nextDeduction).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric"
+                      })} • {daysUntil === 0 ? "Today" : daysUntil === 1 ? "Tomorrow" : `${daysUntil} days`}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-gray-900">{currencySymbol}{group.a?.toLocaleString()}</p>
+                    <p className="text-xs text-gray-600">{group.f}</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    // Handle payment
+                    alert(`Payment of ${currencySymbol}${group.a?.toLocaleString()} for ${group.n} initiated!`);
+                  }}
+                  className={`w-full py-3 rounded-xl font-semibold text-white transition-colors ${
+                    isUrgent
+                      ? "bg-amber-600 hover:bg-amber-700"
+                      : "bg-teal-600 hover:bg-teal-700"
+                  }`}
+                >
+                  Pay Now
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    );
+  };
+
+  // Payout Rotation Schedule Modal
+  const PayoutRotationSchedule = ({ group, onClose }) => {
+    // Generate full rotation schedule
+    const totalMembers = group.m || 6;
+    const currentCycle = group.weeksPaid || 0;
+    const userPosition = group.pos || 1;
+    const weeklyAmount = group.a || 0;
+    const totalPayout = weeklyAmount * totalMembers;
+
+    // Use actual member names from group data
+    const members = Array.from({ length: totalMembers }, (_, i) => {
+      const memberName = group.memberNames && group.memberNames[i]
+        ? group.memberNames[i]
+        : `Member ${i + 1}`;
+
+      return {
+        position: i + 1,
+        name: i + 1 === userPosition ? "You" : memberName,
+        isUser: i + 1 === userPosition,
+        cycleNumber: i + 1,
+        isPaid: i + 1 <= currentCycle,
+        isCurrent: i + 1 === currentCycle + 1,
+        isUpcoming: i + 1 > currentCycle
+      };
+    });
+
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+          <div className="sticky top-0 bg-white border-b border-gray-200 p-6 rounded-t-3xl">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xl font-bold text-gray-900">Payout Rotation</h3>
+              <button
+                onClick={onClose}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <XCircle size={24} className="text-gray-600" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600">{group.n}</p>
+            <div className="mt-4 flex items-center justify-between p-3 bg-teal-50 rounded-xl">
+              <div>
+                <p className="text-xs text-teal-600 font-bold">Total Pool</p>
+                <p className="text-2xl font-bold text-teal-900">{currencySymbol}{totalPayout.toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-teal-600 font-bold">Your Turn</p>
+                <p className="text-2xl font-bold text-teal-900">Cycle {userPosition}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-3">
+            {members.map((member, idx) => {
+              const weeksUntilPayout = member.cycleNumber - currentCycle;
+              const payoutDate = group.nextDeduction
+                ? new Date(new Date(group.nextDeduction).getTime() + (weeksUntilPayout - 1) * 7 * 24 * 60 * 60 * 1000)
+                : null;
+
+              return (
+                <div
+                  key={idx}
+                  className={`p-4 rounded-2xl border-2 transition-all ${
+                    member.isPaid
+                      ? "bg-gray-50 border-gray-200"
+                      : member.isCurrent
+                      ? "bg-emerald-50 border-emerald-300 ring-2 ring-emerald-100"
+                      : member.isUser
+                      ? "bg-teal-50 border-teal-300"
+                      : "bg-white border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${
+                          member.isPaid
+                            ? "bg-gray-200 text-gray-500"
+                            : member.isCurrent
+                            ? "bg-emerald-600 text-white"
+                            : member.isUser
+                            ? "bg-teal-600 text-white"
+                            : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {member.position}
+                      </div>
+                      <div>
+                        <p className={`font-bold ${member.isUser ? "text-teal-900" : "text-gray-900"}`}>
+                          {member.name}
+                          {member.isUser && (
+                            <span className="ml-2 px-2 py-0.5 rounded-full bg-teal-600 text-white text-[10px] font-bold">
+                              YOU
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {member.isPaid ? (
+                            <span className="flex items-center gap-1">
+                              <CheckCircle size={12} className="text-emerald-600" />
+                              Paid
+                            </span>
+                          ) : member.isCurrent ? (
+                            <span className="text-emerald-600 font-bold">Receiving This Cycle</span>
+                          ) : payoutDate ? (
+                            payoutDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                          ) : (
+                            `Cycle ${member.cycleNumber}`
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-lg font-bold ${member.isPaid ? "text-gray-400" : "text-gray-900"}`}>
+                        {currencySymbol}{totalPayout.toLocaleString()}
+                      </p>
+                      {member.isUpcoming && !member.isCurrent && weeksUntilPayout > 0 && (
+                        <p className="text-xs text-gray-600">
+                          {weeksUntilPayout === 1
+                            ? "Next week"
+                            : `In ${weeksUntilPayout} ${group.f === "Weekly" ? "weeks" : "months"}`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 rounded-b-3xl">
+            <div className="bg-gray-50 rounded-xl p-4 mb-4">
+              <h4 className="font-bold text-sm text-gray-900 mb-2">How It Works</h4>
+              <ul className="text-xs text-gray-600 space-y-1">
+                <li>• Each member contributes {currencySymbol}{weeklyAmount.toLocaleString()} {group.f?.toLowerCase() || "weekly"}</li>
+                <li>• One member receives the full pool each cycle</li>
+                <li>• Rotation continues until everyone has received their payout</li>
+                <li>• You're position #{userPosition} in the rotation</li>
+              </ul>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-full py-3 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors"
+            >
+              Got It
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const ROSCAGroupCard = ({ group }) => {
+    const [showSchedule, setShowSchedule] = useState(false);
+    const [showMembers, setShowMembers] = useState(false);
+
+    // Get member initials from names
+    const getInitials = (name) => {
+      if (!name) return "M";
+      const parts = name.split(" ");
+      if (parts.length >= 2) {
+        return parts[0][0] + parts[1][0];
+      }
+      return name.substring(0, 2).toUpperCase();
+    };
+
+    // Generate colors for member avatars
+    const getAvatarColor = (index) => {
+      const colors = [
+        "from-teal-400 to-emerald-500",
+        "from-blue-400 to-indigo-500",
+        "from-purple-400 to-pink-500",
+        "from-orange-400 to-red-500",
+        "from-green-400 to-teal-500",
+        "from-indigo-400 to-purple-500"
+      ];
+      return colors[index % colors.length];
+    };
+
+    const memberCount = group.memberNames?.length || group.c || 0;
+    const displayMembers = group.memberNames?.slice(0, 3) || [];
+
+    return (
+      <>
+        {showSchedule && (
+          <PayoutRotationSchedule group={group} onClose={() => setShowSchedule(false)} />
+        )}
+        {showMembers && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowMembers(false)}>
+            <div className="bg-white rounded-3xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Group Members</h3>
+                <button onClick={() => setShowMembers(false)} className="p-2 rounded-full hover:bg-gray-100">
+                  <XCircle size={24} className="text-gray-600" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">{group.n}</p>
+              <div className="space-y-2">
+                {group.memberNames?.map((name, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getAvatarColor(i)} flex items-center justify-center text-white font-bold text-sm`}>
+                      {getInitials(name)}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900">{name}</p>
+                      <p className="text-xs text-gray-600">Position {i + 1}</p>
+                    </div>
+                  </div>
+                )) || (
+                  <p className="text-sm text-gray-500 text-center py-4">No members yet</p>
+                )}
+              </div>
+              <button
+                onClick={() => setShowMembers(false)}
+                className="w-full mt-4 py-3 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm">
       <div className="flex justify-between items-start mb-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -283,13 +672,22 @@ export default function DashboardScreenNew({
           </div>
           <p className="text-xs text-gray-600">Cycle {group.cp || 1} of {group.m}</p>
         </div>
-        <div className="flex -space-x-2">
-          {[...Array(Math.min(group.mbrs?.length || 3, 3))].map((_, i) => (
-            <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-gradient-to-br from-teal-400 to-emerald-500" />
+        <div
+          className="flex -space-x-2 cursor-pointer hover:scale-105 transition-transform"
+          onClick={() => setShowMembers(true)}
+          title="Click to view all members"
+        >
+          {displayMembers.map((name, i) => (
+            <div
+              key={i}
+              className={`w-8 h-8 rounded-full border-2 border-white bg-gradient-to-br ${getAvatarColor(i)} flex items-center justify-center text-white font-bold text-[10px]`}
+            >
+              {getInitials(name)}
+            </div>
           ))}
-          {(group.mbrs?.length || 6) > 3 && (
+          {memberCount > 3 && (
             <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600">
-              +{(group.mbrs?.length || 6) - 3}
+              +{memberCount - 3}
             </div>
           )}
         </div>
@@ -319,14 +717,16 @@ export default function DashboardScreenNew({
           </div>
         </div>
         <button
-          onClick={() => setCurrentScreen("rosca")}
+          onClick={() => setShowSchedule(true)}
           className="px-4 py-2 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors"
         >
-          View Details
+          View Schedule
         </button>
       </div>
-    </div>
-  );
+        </div>
+      </>
+    );
+  };
 
   // Trust & Credit Score Card
   const ScoreCard = () => (
@@ -386,15 +786,15 @@ export default function DashboardScreenNew({
         <div className="grid grid-cols-3 gap-2 pt-2">
           <div className="text-center">
             <p className="text-xs text-gray-600">On-Time</p>
-            <p className="text-lg font-bold text-gray-900">24</p>
+            <p className="text-lg font-bold text-gray-900">{onTimePayments}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-gray-600">Late</p>
-            <p className="text-lg font-bold text-amber-600">2</p>
+            <p className="text-lg font-bold text-amber-600">{latePayments}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-gray-600">Missed</p>
-            <p className="text-lg font-bold text-red-600">0</p>
+            <p className="text-lg font-bold text-red-600">{missedPayments}</p>
           </div>
         </div>
       </div>
@@ -404,6 +804,43 @@ export default function DashboardScreenNew({
         className="w-full py-2 rounded-xl bg-teal-50 text-teal-700 text-sm font-semibold hover:bg-teal-100 transition-colors"
       >
         View Full Report
+      </button>
+    </div>
+  );
+
+  // Research Data Card
+  const ResearchDataCard = () => (
+    <div className="bg-gradient-to-br from-purple-600 to-indigo-700 text-white rounded-3xl p-5 shadow-sm">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-3 rounded-2xl bg-white/20">
+          <BarChart3 size={24} />
+        </div>
+        <div>
+          <h4 className="font-bold">Research Data</h4>
+          <p className="text-xs text-purple-100">Your progress & insights</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="p-3 bg-white/10 rounded-xl">
+          <p className="text-xs text-purple-100 mb-1">Groups Joined</p>
+          <p className="text-2xl font-bold">{roscaGroups.length}</p>
+        </div>
+        <div className="p-3 bg-white/10 rounded-xl">
+          <p className="text-xs text-purple-100 mb-1">Reliability</p>
+          <p className="text-2xl font-bold">
+            {onTimePayments + latePayments + missedPayments > 0
+              ? Math.round((onTimePayments / (onTimePayments + latePayments + missedPayments)) * 100)
+              : 0}%
+          </p>
+        </div>
+      </div>
+
+      <button
+        onClick={() => setCurrentScreen("research")}
+        className="w-full py-3 rounded-xl bg-white text-purple-700 font-semibold hover:bg-purple-50 transition-colors"
+      >
+        View Research Insights
       </button>
     </div>
   );
@@ -733,8 +1170,10 @@ export default function DashboardScreenNew({
             </section>
 
             <QuickActions />
+            <ContributionSchedule />
             <ROSCAGroups />
             <ScoreCard />
+            <ResearchDataCard />
           </div>
         )}
 
