@@ -808,42 +808,44 @@ export default function DashboardScreenNew({
     </div>
   );
 
-  // Research Data Card
-  const ResearchDataCard = () => (
-    <div className="bg-gradient-to-br from-purple-600 to-indigo-700 text-white rounded-3xl p-5 shadow-sm">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="p-3 rounded-2xl bg-white/20">
-          <BarChart3 size={24} />
-        </div>
-        <div>
-          <h4 className="font-bold">Research Data</h4>
-          <p className="text-xs text-purple-100">Your progress & insights</p>
-        </div>
-      </div>
+  // Research Data Card (Admin Only)
+  const ResearchDataCard = () => {
+    // Only show for admin and superadmin users
+    const isAdmin = userData?.role === "admin" || userData?.role === "superadmin";
+    if (!isAdmin) return null;
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="p-3 bg-white/10 rounded-xl">
-          <p className="text-xs text-purple-100 mb-1">Groups Joined</p>
-          <p className="text-2xl font-bold">{roscaGroups.length}</p>
+    return (
+      <div className="bg-gradient-to-br from-purple-600 to-indigo-700 text-white rounded-3xl p-5 shadow-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 rounded-2xl bg-white/20">
+            <BarChart3 size={24} />
+          </div>
+          <div>
+            <h4 className="font-bold">Research Data</h4>
+            <p className="text-xs text-purple-100">System analytics & insights</p>
+          </div>
         </div>
-        <div className="p-3 bg-white/10 rounded-xl">
-          <p className="text-xs text-purple-100 mb-1">Reliability</p>
-          <p className="text-2xl font-bold">
-            {onTimePayments + latePayments + missedPayments > 0
-              ? Math.round((onTimePayments / (onTimePayments + latePayments + missedPayments)) * 100)
-              : 0}%
-          </p>
-        </div>
-      </div>
 
-      <button
-        onClick={() => setCurrentScreen("research")}
-        className="w-full py-3 rounded-xl bg-white text-purple-700 font-semibold hover:bg-purple-50 transition-colors"
-      >
-        View Research Insights
-      </button>
-    </div>
-  );
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="p-3 bg-white/10 rounded-xl">
+            <p className="text-xs text-purple-100 mb-1">Total Users</p>
+            <p className="text-2xl font-bold">-</p>
+          </div>
+          <div className="p-3 bg-white/10 rounded-xl">
+            <p className="text-xs text-purple-100 mb-1">Avg Reliability</p>
+            <p className="text-2xl font-bold">-</p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setCurrentScreen("research")}
+          className="w-full py-3 rounded-xl bg-white text-purple-700 font-semibold hover:bg-purple-50 transition-colors"
+        >
+          View Research Dashboard
+        </button>
+      </div>
+    );
+  };
 
   // Bottom Navigation
   const BottomNav = () => (

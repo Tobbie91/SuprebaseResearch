@@ -18,6 +18,10 @@ import {
 import { getUserResearchData, getSystemWideAnalytics, exportResearchDataToCSV } from "../lib/researchDataUtils";
 
 export default function ResearchDataScreen({ userData, setCurrentScreen }) {
+  // Check if user is admin/superadmin
+  const isAdmin = userData?.role === "admin" || userData?.role === "superadmin";
+
+  // Regular users can only see individual view, admins can see both
   const [viewMode, setViewMode] = useState("individual"); // "individual" or "system"
   const [individualData, setIndividualData] = useState(null);
   const [systemData, setSystemData] = useState(null);
@@ -33,7 +37,8 @@ export default function ResearchDataScreen({ userData, setCurrentScreen }) {
       if (viewMode === "individual" && userData?.id) {
         const data = await getUserResearchData(userData.id);
         setIndividualData(data);
-      } else if (viewMode === "system") {
+      } else if (viewMode === "system" && isAdmin) {
+        // Only admins can access system-wide data
         const data = await getSystemWideAnalytics();
         setSystemData(data);
       }
@@ -69,34 +74,38 @@ export default function ResearchDataScreen({ userData, setCurrentScreen }) {
           <ArrowLeft size={24} />
         </button>
 
-        <h1 className="text-2xl font-bold mb-2">Research Data</h1>
+        <h1 className="text-2xl font-bold mb-2">
+          {isAdmin ? "Research Dashboard" : "My Research Data"}
+        </h1>
         <p className="text-indigo-100 text-sm">
-          Analyze baseline vs. current activity
+          {isAdmin ? "Analyze baseline vs. current activity" : "Your progress and insights"}
         </p>
 
-        {/* View Mode Toggle */}
-        <div className="mt-6 flex gap-2 bg-white/10 rounded-2xl p-1">
-          <button
-            onClick={() => setViewMode("individual")}
-            className={`flex-1 py-2 px-4 rounded-xl font-semibold text-sm transition-all ${
-              viewMode === "individual"
-                ? "bg-white text-indigo-600"
-                : "text-white hover:bg-white/10"
-            }`}
-          >
-            My Data
-          </button>
-          <button
-            onClick={() => setViewMode("system")}
-            className={`flex-1 py-2 px-4 rounded-xl font-semibold text-sm transition-all ${
-              viewMode === "system"
-                ? "bg-white text-indigo-600"
-                : "text-white hover:bg-white/10"
-            }`}
-          >
-            System Average
-          </button>
-        </div>
+        {/* View Mode Toggle - Only for Admins */}
+        {isAdmin && (
+          <div className="mt-6 flex gap-2 bg-white/10 rounded-2xl p-1">
+            <button
+              onClick={() => setViewMode("individual")}
+              className={`flex-1 py-2 px-4 rounded-xl font-semibold text-sm transition-all ${
+                viewMode === "individual"
+                  ? "bg-white text-indigo-600"
+                  : "text-white hover:bg-white/10"
+              }`}
+            >
+              My Data
+            </button>
+            <button
+              onClick={() => setViewMode("system")}
+              className={`flex-1 py-2 px-4 rounded-xl font-semibold text-sm transition-all ${
+                viewMode === "system"
+                  ? "bg-white text-indigo-600"
+                  : "text-white hover:bg-white/10"
+              }`}
+            >
+              System Average
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content */}
