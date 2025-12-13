@@ -808,11 +808,9 @@ export default function DashboardScreenNew({
     </div>
   );
 
-  // Research Data Card (Admin Only)
+  // Research Data Card (Shows different content for users vs admins)
   const ResearchDataCard = () => {
-    // Only show for admin and superadmin users
     const isAdmin = userData?.role === "admin" || userData?.role === "superadmin";
-    if (!isAdmin) return null;
 
     return (
       <div className="bg-gradient-to-br from-purple-600 to-indigo-700 text-white rounded-3xl p-5 shadow-sm">
@@ -821,19 +819,27 @@ export default function DashboardScreenNew({
             <BarChart3 size={24} />
           </div>
           <div>
-            <h4 className="font-bold">Research Data</h4>
-            <p className="text-xs text-purple-100">System analytics & insights</p>
+            <h4 className="font-bold">
+              {isAdmin ? "Research Dashboard" : "My Research Data"}
+            </h4>
+            <p className="text-xs text-purple-100">
+              {isAdmin ? "System analytics & insights" : "Your progress & insights"}
+            </p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="p-3 bg-white/10 rounded-xl">
-            <p className="text-xs text-purple-100 mb-1">Total Users</p>
-            <p className="text-2xl font-bold">-</p>
+            <p className="text-xs text-purple-100 mb-1">Groups Joined</p>
+            <p className="text-2xl font-bold">{roscaGroups.length}</p>
           </div>
           <div className="p-3 bg-white/10 rounded-xl">
-            <p className="text-xs text-purple-100 mb-1">Avg Reliability</p>
-            <p className="text-2xl font-bold">-</p>
+            <p className="text-xs text-purple-100 mb-1">Reliability</p>
+            <p className="text-2xl font-bold">
+              {onTimePayments + latePayments + missedPayments > 0
+                ? Math.round((onTimePayments / (onTimePayments + latePayments + missedPayments)) * 100)
+                : 0}%
+            </p>
           </div>
         </div>
 
@@ -841,7 +847,7 @@ export default function DashboardScreenNew({
           onClick={() => setCurrentScreen("research")}
           className="w-full py-3 rounded-xl bg-white text-purple-700 font-semibold hover:bg-purple-50 transition-colors"
         >
-          View Research Dashboard
+          {isAdmin ? "View Research Dashboard" : "View My Insights"}
         </button>
       </div>
     );
