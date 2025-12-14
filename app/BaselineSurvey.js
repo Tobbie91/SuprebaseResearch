@@ -46,6 +46,9 @@ export default function BaselineSurvey({ onComplete, saveData }) {
   };
 
   const handleNext = () => {
+    // Scroll to top when moving to next step
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
     if (step < 3) {
       setStep(step + 1);
     } else {
