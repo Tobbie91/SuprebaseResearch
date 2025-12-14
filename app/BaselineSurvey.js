@@ -63,10 +63,6 @@ export default function BaselineSurvey({ onComplete, saveData }) {
     }
   };
 
-  const handleSkip = () => {
-    if (saveData) saveData({ baselineSurveySkipped: true });
-    if (onComplete) onComplete();
-  };
 
   const canContinue = () => {
     if (step === 1) {
@@ -528,13 +524,6 @@ export default function BaselineSurvey({ onComplete, saveData }) {
         >
           {step === 3 ? "Complete Survey" : "Continue"}
           <ChevronRight size={20} />
-        </button>
-
-        <button
-          onClick={handleSkip}
-          className="w-full py-4 rounded-full font-semibold text-gray-600 bg-white border-2 border-gray-300 hover:bg-gray-50 transition-colors"
-        >
-          Skip for now
         </button>
 
         <p className="text-xs text-center text-gray-500">
