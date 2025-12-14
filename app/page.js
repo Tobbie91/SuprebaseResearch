@@ -1484,6 +1484,70 @@ useEffect(() => {
     if (s === "splash") setTimeout(() => sS("welcome"), 2500);
   }, [s]);
 
+  // ===== EXPOSE AUTO-FILL FOR TESTING =====
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.autoFillGroup = autoFillGroup;
+      console.log("🧪 Test helper available: window.autoFillGroup('groupId')");
+    }
+  }, []);
+
+  // ===== REAL-TIME GROUP UPDATES =====
+  useEffect(() => {
+    if (!auth?.currentUser || !uD?.jG || uD.jG.length === 0) {
+      return;
+    }
+
+    console.log("🔄 Setting up real-time group listeners for", uD.jG.length, "groups");
+
+    // Create listeners for each group the user has joined
+    const unsubscribers = [];
+
+    uD.jG.forEach((joinedGroup) => {
+      const groupRef = doc(db, "groups", joinedGroup.id);
+
+      const unsubscribe = onSnapshot(groupRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const updatedGroupData = snapshot.data();
+          console.log(`🔔 Group update: ${updatedGroupData.n} - ${updatedGroupData.c}/${updatedGroupData.m} members`);
+
+          // Update the user's joined groups with the latest data
+          sUD(prevUserData => {
+            const updatedJoinedGroups = prevUserData.jG.map(group => {
+              if (group.id === joinedGroup.id) {
+                return {
+                  ...group,
+                  c: updatedGroupData.c,
+                  members: updatedGroupData.members,
+                  memberNames: updatedGroupData.memberNames,
+                  started: updatedGroupData.started,
+                  nextDeduction: updatedGroupData.nextDeduction,
+                  weeksPaid: updatedGroupData.weeksPaid
+                };
+              }
+              return group;
+            });
+
+            return {
+              ...prevUserData,
+              jG: updatedJoinedGroups
+            };
+          });
+        }
+      }, (error) => {
+        console.error(`❌ Error listening to group ${joinedGroup.id}:`, error);
+      });
+
+      unsubscribers.push(unsubscribe);
+    });
+
+    // Cleanup all listeners on unmount
+    return () => {
+      console.log("🛑 Cleaning up group listeners");
+      unsubscribers.forEach(unsubscribe => unsubscribe());
+    };
+  }, [uD?.id, uD?.jG?.length]); // Re-run when user joins/leaves groups
+
   // ===== ROSCA WEEKLY DEDUCTION SIMULATION =====
   useEffect(() => {
     if (!uD || !uD.jG) return;
@@ -1558,6 +1622,80 @@ useEffect(() => {
     } catch (error) {
       console.error("❌ Seeding error:", error);
       alert(`❌ Seeding failed: ${error.message}`);
+    }
+  };
+
+  // ===== AUTO-FILL GROUP WITH DUMMY USERS FOR TESTING =====
+  const autoFillGroup = async (groupId) => {
+    console.log(`🤖 Auto-filling group: ${groupId}`);
+
+    try {
+      const groupRef = doc(db, "groups", groupId);
+      const groupSnap = await getDoc(groupRef);
+
+      if (!groupSnap.exists()) {
+        alert("❌ Group not found!");
+        return;
+      }
+
+      const groupData = groupSnap.data();
+      const currentMembers = groupData.members || [];
+      const currentMemberNames = groupData.memberNames || [];
+      const maxMembers = groupData.m || 6;
+      const slotsToFill = maxMembers - currentMembers.length;
+
+      if (slotsToFill <= 0) {
+        alert("✅ Group is already full!");
+        return;
+      }
+
+      // Generate dummy test users
+      const dummyNames = [
+        "Adewale Johnson", "Chioma Okafor", "Yemi Adeleke",
+        "Bola Adeyemi", "Kemi Oladipo", "Segun Fashola",
+        "Ngozi Umeh", "Tunde Bakare", "Folake Oni"
+      ];
+
+      const newMembers = [];
+      const newMemberNames = [];
+
+      for (let i = 0; i < slotsToFill; i++) {
+        const dummyId = `test_user_${Date.now()}_${i}`;
+        const dummyName = dummyNames[currentMembers.length + i] || `Test User ${i + 1}`;
+        newMembers.push(dummyId);
+        newMemberNames.push(dummyName);
+      }
+
+      // Calculate next deduction date (7 days from now)
+      const nextDeduction = new Date();
+      nextDeduction.setDate(nextDeduction.getDate() + 7);
+
+      // Update group to be full and started
+      await updateDoc(groupRef, {
+        c: maxMembers,
+        members: [...currentMembers, ...newMembers],
+        memberNames: [...currentMemberNames, ...newMemberNames],
+        started: true,
+        weeksPaid: 0,
+        nextDeduction: nextDeduction.toISOString(),
+        lastUpdated: new Date().toISOString()
+      });
+
+      console.log(`✅ Group filled! Added ${slotsToFill} dummy users`);
+      alert(
+        `✅ Group Auto-Filled!\n\n` +
+        `Group: ${groupData.n}\n` +
+        `Added: ${slotsToFill} dummy members\n` +
+        `Status: STARTED\n` +
+        `Next payment: ${nextDeduction.toLocaleDateString()}\n\n` +
+        `Members: ${[...currentMemberNames, ...newMemberNames].join(", ")}`
+      );
+
+      // Reload groups
+      await loadGroupsFromFirebase();
+    } catch (error) {
+      console.error("❌ Auto-fill error:", error);
+      alert(`❌ Auto-fill failed: ${error.message}`);
     }
   };
 
@@ -4711,7 +4849,16 @@ useEffect(() => {
       case "welcome":
         return <Welcome onSignup={hSU} onLogin={hLI} />;
       case "kyc":
-        return <BaselineSurvey onComplete={() => sS("dashboard")} saveData={svD} />;
+        return <BaselineSurvey
+          onComplete={async () => {
+            // Automatically claim token for new users
+            if (!uD?.hC) {
+              await claimToken();
+            }
+            sS("dashboard");
+          }}
+          saveData={svD}
+        />;
       case "dashboard":
         if (uR === "superadmin")
           return (

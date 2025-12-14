@@ -285,7 +285,8 @@ export default function DashboardScreenNew({
 
   // ROSCA Groups Component
   const ROSCAGroups = () => {
-    const activeGroups = roscaGroups.filter(g => g.started);
+    // Show all groups (both started and waiting to start)
+    const userGroups = roscaGroups;
 
     return (
     <section>
@@ -300,7 +301,7 @@ export default function DashboardScreenNew({
       </div>
 
       <div className="space-y-4">
-        {activeGroups.length === 0 ? (
+        {userGroups.length === 0 ? (
           <div className="bg-white rounded-3xl p-8 border border-gray-200 text-center">
             <Users size={48} className="mx-auto mb-4 text-gray-400" />
             <h4 className="font-bold text-gray-900 mb-2">No Groups Yet</h4>
@@ -313,7 +314,7 @@ export default function DashboardScreenNew({
             </button>
           </div>
         ) : (
-          activeGroups.slice(0, 2).map((group, idx) => (
+          userGroups.slice(0, 2).map((group, idx) => (
             <ROSCAGroupCard key={group.id || idx} group={group} />
           ))
         )}

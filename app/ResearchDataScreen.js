@@ -136,10 +136,40 @@ function IndividualDataView({ data }) {
     );
   }
 
-  const { baseline, activity, comparison } = data;
+  const { baseline, activity, comparison, userId, name } = data;
+
+  // Export individual data to JSON
+  const handleExportIndividual = () => {
+    const exportData = {
+      userId,
+      name,
+      exportedAt: new Date().toISOString(),
+      baseline,
+      currentActivity: activity,
+      comparison
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `research-data-${userId}-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-4">
+      {/* Export Button */}
+      <button
+        onClick={handleExportIndividual}
+        className="w-full bg-indigo-600 text-white rounded-2xl p-4 font-semibold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors"
+      >
+        <Download size={20} />
+        Export My Research Data
+      </button>
+
       {/* Summary Card */}
       <div className="bg-gradient-to-br from-indigo-600 to-purple-700 text-white rounded-3xl p-6">
         <h2 className="text-xl font-bold mb-4">Your Research Profile</h2>
@@ -280,50 +310,195 @@ function IndividualDataView({ data }) {
         </div>
       )}
 
-      {/* Baseline Comparison */}
-      {comparison.available && (
+      {/* Baseline Comparison - Enhanced */}
+      {comparison.available && baseline && (
         <div className="bg-white rounded-3xl p-6 border border-gray-200">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 rounded-2xl bg-purple-50">
               <TrendingUp size={24} className="text-purple-600" />
             </div>
             <div>
-              <h3 className="font-bold text-gray-900">Before vs. After</h3>
-              <p className="text-xs text-gray-600">Baseline comparison</p>
+              <h3 className="font-bold text-gray-900">Baseline vs Current Activity</h3>
+              <p className="text-xs text-gray-600">How you've progressed since joining</p>
             </div>
           </div>
 
           <div className="space-y-4">
-            {/* ROSCA Experience */}
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <p className="text-xs text-gray-600 font-bold mb-2">ROSCA Experience</p>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-500">Before</p>
-                  <p className="font-semibold text-gray-900">{comparison.roscaExperience.before}</p>
+            {/* Financial Situation */}
+            <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl border border-purple-200">
+              <p className="text-sm font-bold text-purple-900 mb-3">💰 Financial Situation</p>
+
+              {baseline.monthlyIncome && (
+                <div className="flex items-center justify-between mb-2 pb-2 border-b border-purple-200">
+                  <span className="text-xs text-purple-700">Monthly Income (Baseline)</span>
+                  <span className="font-semibold text-purple-900">{baseline.monthlyIncome}</span>
                 </div>
-                <div className="text-gray-400">→</div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">After</p>
-                  <p className="font-semibold text-teal-600">{comparison.roscaExperience.after}</p>
+              )}
+
+              {baseline.currentSavings !== undefined && (
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-purple-700">Savings</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-500">Before</p>
+                      <p className="font-semibold text-gray-900">
+                        {typeof baseline.currentSavings === 'number'
+                          ? `₦${baseline.currentSavings.toLocaleString()}`
+                          : baseline.currentSavings}
+                      </p>
+                    </div>
+                    <div className="text-purple-400">→</div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">Now</p>
+                      <p className="font-semibold text-teal-600">
+                        ₦{activity.financial.totalBalance.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  {comparison.savingsBehavior.change !== "N/A" && (
+                    <p className="text-xs text-center mt-2 font-semibold text-teal-600">
+                      {comparison.savingsBehavior.change} change
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {baseline.savingsFrequency && (
+                <div className="flex items-center justify-between pt-2 border-t border-purple-200">
+                  <span className="text-xs text-purple-700">Savings Frequency (Baseline)</span>
+                  <span className="font-semibold text-purple-900">{baseline.savingsFrequency}</span>
+                </div>
+              )}
+            </div>
+
+            {/* ROSCA Experience */}
+            <div className="p-4 bg-gradient-to-br from-teal-50 to-emerald-50 rounded-xl border border-teal-200">
+              <p className="text-sm font-bold text-teal-900 mb-3">👥 ROSCA Participation</p>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-xs text-gray-500">Before Joining</p>
+                    <p className="font-semibold text-gray-900">{comparison.roscaExperience.before}</p>
+                  </div>
+                  <div className="text-teal-400">→</div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Current Status</p>
+                    <p className="font-semibold text-teal-600">{comparison.roscaExperience.after}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-teal-200">
+                <p className="text-xs text-teal-700 mb-2">Current Activity</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="text-center p-2 bg-white rounded-lg">
+                    <p className="text-lg font-bold text-teal-600">{activity.rosca.totalGroupsJoined}</p>
+                    <p className="text-xs text-gray-600">Joined</p>
+                  </div>
+                  <div className="text-center p-2 bg-white rounded-lg">
+                    <p className="text-lg font-bold text-teal-600">{activity.rosca.activeGroups}</p>
+                    <p className="text-xs text-gray-600">Active</p>
+                  </div>
+                  <div className="text-center p-2 bg-white rounded-lg">
+                    <p className="text-lg font-bold text-teal-600">{activity.rosca.completedGroups}</p>
+                    <p className="text-xs text-gray-600">Completed</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Financial Goals */}
-            {comparison.financialGoals.stated.length > 0 && (
-              <div className="p-4 bg-gray-50 rounded-xl">
-                <p className="text-xs text-gray-600 font-bold mb-2">Financial Goals</p>
-                {comparison.financialGoals.stated.map((goal, i) => (
-                  <div key={i} className="flex items-start gap-2 mb-2">
-                    <CheckCircle size={16} className="text-teal-600 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900">{goal}</p>
-                    </div>
+            {/* Borrowing Habits */}
+            {baseline.borrowingFrequency && (
+              <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                <p className="text-sm font-bold text-amber-900 mb-3">💳 Borrowing Behavior</p>
+
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-amber-700">Baseline Borrowing Frequency</span>
+                  <span className="font-semibold text-amber-900">{baseline.borrowingFrequency}</span>
+                </div>
+
+                {baseline.emergencyFund !== undefined && (
+                  <div className="flex items-center justify-between pt-2 border-t border-amber-200">
+                    <span className="text-xs text-amber-700">Had Emergency Fund</span>
+                    <span className="font-semibold text-amber-900">{baseline.emergencyFund}</span>
                   </div>
-                ))}
+                )}
               </div>
             )}
+
+            {/* Investment Experience */}
+            {baseline.hasInvested !== undefined && (
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                <p className="text-sm font-bold text-blue-900 mb-3">📈 Investment Experience</p>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-blue-700">Previous Investment Experience</span>
+                  <span className="font-semibold text-blue-900">{baseline.hasInvested}</span>
+                </div>
+
+                {baseline.riskTolerance && (
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-blue-200">
+                    <span className="text-xs text-blue-700">Risk Tolerance</span>
+                    <span className="font-semibold text-blue-900">{baseline.riskTolerance}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Financial Goals Progress */}
+            {comparison.financialGoals.stated.length > 0 && (
+              <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200">
+                <p className="text-sm font-bold text-emerald-900 mb-3">🎯 Financial Goals Progress</p>
+                <div className="space-y-3">
+                  {comparison.financialGoals.progress !== "No goals specified" &&
+                   Array.isArray(comparison.financialGoals.progress) ? (
+                    comparison.financialGoals.progress.map((goalProgress, i) => (
+                      <div key={i} className="bg-white rounded-lg p-3">
+                        <div className="flex items-start gap-2 mb-2">
+                          <CheckCircle size={16} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-gray-900">{goalProgress.goal}</p>
+                            <p className="text-xs text-emerald-600 mt-1">Status: {goalProgress.status}</p>
+                            <p className="text-xs text-gray-600 mt-1">{goalProgress.metric}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    comparison.financialGoals.stated.map((goal, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <CheckCircle size={16} className="text-emerald-600 mt-0.5" />
+                        <p className="text-sm text-gray-900">{goal}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Trust Development */}
+            <div className="p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-200">
+              <p className="text-sm font-bold text-indigo-900 mb-3">⭐ Trust & Reliability</p>
+
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="bg-white rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-indigo-600">{activity.trust.score}</p>
+                  <p className="text-xs text-gray-600">Trust Score</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-emerald-600">{activity.trust.reliabilityRate}%</p>
+                  <p className="text-xs text-gray-600">Reliability</p>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-indigo-200">
+                <p className="text-xs text-indigo-700 mb-2">Payment Record</p>
+                <p className="text-xs text-gray-600">{comparison.trustDevelopment.paymentRecord}</p>
+              </div>
+            </div>
           </div>
         </div>
       )}

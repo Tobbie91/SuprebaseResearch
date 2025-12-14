@@ -277,6 +277,7 @@ export default function Welcome({ onSignup, onLogin }) {
         phone: form.phone.trim(),
         password: form.password, // Don't trim password
         role: "user",
+        preferredCurrency: form.preferredCurrency, // Include currency selection
       };
 
       // 🔒 TIMEOUT PROTECTION (30 seconds)
