@@ -1866,9 +1866,12 @@ useEffect(() => {
         kycComplete: false,
         createdAt: new Date().toISOString(),
 
-        // Perfect scores for new users until behavior changes them
-        trustScore: 100,
-        creditScore: 850,
+        // Initial scores reflecting "conditional inclusion" rather than earned credibility
+        // 40-45: Verified but unproven, eligible to participate with guardrails
+        // Trust must be earned through observable behavior (ROSCA participation, payment consistency)
+        // Credit builds through repayment history and financial activity
+        trustScore: 42, // Socially admissible, not financially endorsed
+        creditScore: 450, // Below average but not excluded - room to build
 
         // Baseline survey data (to be filled later)
         baselineSurvey: null,
@@ -2045,6 +2048,32 @@ useEffect(() => {
   useEffect(() => {
     if (uD && !uD.wallets && uD.wb !== undefined) {
       migrateToMultiCurrency();
+    }
+  }, [uD]);
+
+  // ===== MIGRATE OLD USERS TO NEW TRUST SCORE SYSTEM =====
+  const migrateToNewTrustScores = async () => {
+    if (uD && uD.trustScore === 100 && uD.creditScore === 850) {
+      console.log("🔄 Migrating user to new trust score system...");
+      console.log("Old scores - Trust: 100, Credit: 850");
+
+      // NEW RESEARCH-BACKED SCORES
+      // Trust: 42 (conditional inclusion - verified but unproven)
+      // Credit: 450 (room to build through behavior)
+      await svD({
+        trustScore: 42,
+        creditScore: 450,
+      });
+
+      console.log("✅ Trust score migration complete!");
+      console.log("New scores - Trust: 42, Credit: 450");
+    }
+  };
+
+  // Call trust score migration when user data loads
+  useEffect(() => {
+    if (uD && uD.trustScore === 100 && uD.creditScore === 850) {
+      migrateToNewTrustScores();
     }
   }, [uD]);
 
